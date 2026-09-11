@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Supplier {
+  id              Int        @id @default(autoincrement())
+  code            String     @unique
+  name            String
+  productName     String?
+  address         String?
+  taxCode         String?
+  storage         String?
+  shelfLife       String?
+  sourceUrl       String?
+  legacyDocsUrl   String?
+  status          String     @default("ACTIVE")
+  notes           String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  documents       Document[]
+}
+
+model Document {
+  id          Int       @id @default(autoincrement())
+  supplierId  Int
+  title       String
+  category    String    @default("OTHER")
+  fileUrl     String
+  issuedAt    DateTime?
+  expiresAt   DateTime?
+  status      String    @default("VALID")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  supplier    Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+}
