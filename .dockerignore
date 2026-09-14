@@ -1,0 +1,9 @@
+.git
+.next
+node_modules
+.env*
+*.db
+*.db-journal
+storage/uploads/*
+public/uploads/*
+npm-debug.log*

@@ -1,40 +1,82 @@
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
 }
 
 model Supplier {
   id              Int        @id @default(autoincrement())
   code            String     @unique
   name            String
+  nameEn          String?
   productName     String?
+  productNameEn   String?
   address         String?
+  addressEn       String?
   taxCode         String?
   storage         String?
+  storageEn       String?
   shelfLife       String?
+  shelfLifeEn     String?
   sourceUrl       String?
   legacyDocsUrl   String?
   status          String     @default("ACTIVE")
+  verificationStatus String  @default("PENDING")
   notes           String?
+  notesEn         String?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
   documents       Document[]
+  auditLogs       AuditLog[]
+
+  @@index([code])
+  @@index([name])
 }
 
 model Document {
   id          Int       @id @default(autoincrement())
   supplierId  Int
   title       String
+  titleEn     String?
   category    String    @default("OTHER")
   fileUrl     String
   issuedAt    DateTime?
   expiresAt   DateTime?
   status      String    @default("VALID")
+  isPublic    Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   supplier    Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  versions    DocumentVersion[]
+
+  @@index([supplierId])
+  @@index([expiresAt])
+}
+
+model DocumentVersion {
+  id          Int       @id @default(autoincrement())
+  documentId  Int
+  fileUrl     String
+  note        String?
+  createdAt   DateTime  @default(now())
+  document    Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+}
+
+model AuditLog {
+  id          Int       @id @default(autoincrement())
+  supplierId  Int?
+  action      String
+  entity      String
+  entityId    String?
+  summary     String
+  createdAt   DateTime  @default(now())
+  supplier    Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  @@index([supplierId])
+  @@index([createdAt])
 }
