@@ -20,6 +20,7 @@
     "test:import": "node --import tsx --test tests/smartcheck-import.test.ts",
     "test:ai": "node --import tsx --test tests/ai-extraction.test.ts",
     "test:ai-settings": "node --import tsx --test tests/ai-settings.test.ts",
+    "test:security": "node --import tsx --test tests/security.test.ts",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",

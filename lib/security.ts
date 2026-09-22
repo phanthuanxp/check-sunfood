@@ -3,7 +3,10 @@ import { NextResponse } from 'next/server';
 export function rejectUntrustedMutation(request: Request) {
   const origin = request.headers.get('origin');
   const fetchSite = request.headers.get('sec-fetch-site');
-  if (origin && origin !== new URL(request.url).origin) {
+  // Behind Nginx, request.url can describe the internal HTTP listener rather
+  // than the public HTTPS origin seen by the browser.
+  const expectedOrigin = new URL(process.env.NEXT_PUBLIC_SITE_URL || request.url).origin;
+  if (origin && origin !== expectedOrigin) {
     return NextResponse.json({ error: 'Nguồn yêu cầu không hợp lệ.' }, { status: 403 });
   }
   if (fetchSite && !['same-origin', 'same-site', 'none'].includes(fetchSite)) {
