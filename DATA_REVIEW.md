@@ -24,3 +24,17 @@ Trạng thái đối chiếu mặc định của dữ liệu seed là `PENDING`.
 - Đối chiếu tên pháp lý, địa chỉ hành chính hiện hành, MST, nhóm sản phẩm và trạng thái hợp tác của toàn bộ NCC-01 đến NCC-23 với hồ sơ nội bộ.
 - Xác nhận ngày cấp/ngày hết hạn và quyền công bố cho từng giấy tờ trước khi upload.
 - Giữ nguyên mã public NCC-01 đến NCC-23 kể cả khi chỉnh tên hoặc thông tin nhà cung cấp.
+
+## Bản nháp nhập SmartCheck ngày 22/09/2026
+
+Đã lấy 23/23 trang nguồn vào `ImportDraft` của SQLite localhost. **Chưa bản nháp nào được duyệt**. Bản nháp chỉ cung cấp trường có thể đọc từ HTML, không phải xác nhận tính pháp lý hay tình trạng hợp tác hiện tại. Những chỗ nguồn thiếu hoặc trình bày lẫn nhiều chủ thể phải đối chiếu bằng hồ sơ Sunfood:
+
+- NCC-03: vùng tên/địa chỉ dính nhau; parser không đề xuất tên hoặc địa chỉ.
+- NCC-04: trang nguồn không có nhãn nhà cung cấp rõ ràng; chỉ giữ tên sản phẩm.
+- NCC-09: nguồn có địa chỉ và MST, nhưng tên lẫn câu mô tả sản phẩm; không đề xuất tên pháp lý. So sánh địa chỉ/MST với hồ sơ trước khi duyệt.
+- NCC-12: phần địa chỉ lẫn thêm một nhà cung cấp khác; không đề xuất địa chỉ.
+- NCC-14, NCC-19: nguồn chỉ có tên sản phẩm, không thể suy ra tên pháp lý/địa chỉ/MST.
+- NCC-18: trang liệt kê hai nhà cung cấp và phần bảo quản dính thông tin đối tác; không đề xuất tên/địa chỉ/bảo quản.
+- NCC-17: nguồn của chính Sunfood; không suy ra thông tin pháp lý NCC từ trang mô tả sản phẩm.
+
+Các giá trị bảo quản/hạn dùng trích từ nguồn cũ cũng cần đối chiếu bao bì và hồ sơ theo từng sản phẩm/lô, không mặc nhiên áp dụng cho mọi hàng của một NCC. QR thứ 24 chưa được cung cấp; không tạo tên, địa chỉ hoặc mã định danh thay người dùng.

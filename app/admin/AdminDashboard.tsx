@@ -2,7 +2,7 @@
 /* eslint-disable @next/next/no-html-link-for-pages -- Route-handler download links must remain native anchors. */
 /* eslint-disable @next/next/no-img-element -- QR and uploaded-document previews are dynamic API resources. */
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Version = {
@@ -44,6 +44,7 @@ type Supplier = {
   documents: DocumentItem[];
 };
 type Audit = { id: number; summary: string; createdAt: string };
+type AiSuggestion = { title: string | null; category: string | null; supplierName: string | null; taxCode: string | null; documentNumber: string | null; issuedAt: string | null; expiresAt: string | null; evidence: string | null; warnings: string[] };
 
 const emptySupplier = {
   code: "",
@@ -125,6 +126,9 @@ export default function AdminDashboard({
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [activeView, setActiveView] = useState<AdminView>(initialView);
+  const documentFormRef = useRef<HTMLFormElement>(null);
+  const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
 
   const docs = useMemo(
     () =>
@@ -213,6 +217,7 @@ export default function AdminDashboard({
     setSelected(s);
     setEditingDocument(null);
     setShowDocumentForm(false);
+    setAiSuggestion(null);
     setMessage("");
   }
 
@@ -267,6 +272,48 @@ export default function AdminDashboard({
       return setMessage(result.error || "Không thể lưu hồ sơ.");
     }
     window.location.reload();
+  }
+
+  async function analyzeDocument() {
+    if (!selected || !documentFormRef.current) return;
+    const form = new FormData(documentFormRef.current);
+    const file = form.get('file');
+    if (!(file instanceof File) || !file.size) return setMessage('Chọn tệp PDF/JPG/PNG trước khi phân tích.');
+    if (form.get('aiConsent') !== 'on') return setMessage('Anh cần xác nhận quyền gửi tệp cho dịch vụ AI trước khi phân tích.');
+    const payload = new FormData();
+    payload.set('file', file); payload.set('consent', 'yes');
+    payload.set('supplierName', selected.name); payload.set('supplierTaxCode', selected.taxCode || '');
+    setAiBusy(true); setMessage(''); setAiSuggestion(null);
+    try {
+      const response = await fetch('/api/admin/ai/extract', { method: 'POST', body: payload });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Không thể phân tích hồ sơ.');
+      setAiSuggestion(data.extracted);
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Không thể phân tích hồ sơ.'); }
+    finally { setAiBusy(false); }
+  }
+
+  async function draftTranslation() {
+    if (!window.confirm('Gửi các trường mô tả tiếng Việt đang nhập đến dịch vụ AI để tạo bản dịch nháp? Không gửi tệp hồ sơ.')) return;
+    setBusy(true); setMessage('Đang tạo bản dịch tiếng Anh để anh kiểm tra…');
+    try {
+      const response = await fetch('/api/admin/ai/translate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(supplierForm) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Không thể dịch.');
+      setSupplierForm(current => ({ ...current, ...data.translations }));
+      setMessage('Đã điền bản dịch nháp. Anh hãy kiểm tra thuật ngữ và sửa trước khi lưu.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Không thể dịch.'); }
+    finally { setBusy(false); }
+  }
+
+  function applyAiSuggestion() {
+    if (!aiSuggestion || !documentFormRef.current) return;
+    for (const key of ['title', 'category', 'issuedAt', 'expiresAt'] as const) {
+      const value = aiSuggestion[key];
+      const element = documentFormRef.current.elements.namedItem(key);
+      if (value && (element instanceof HTMLInputElement || element instanceof HTMLSelectElement)) element.value = value;
+    }
+    setMessage('Đã điền bản nháp vào biểu mẫu. Anh hãy đối chiếu bản gốc trước khi lưu; AI không tự công khai hồ sơ.');
   }
 
   async function removeDocument(document: DocumentItem) {
@@ -361,6 +408,9 @@ export default function AdminDashboard({
             <span>⌂</span><b>Tổng quan</b>
           </button>
           <button className={activeView === "suppliers" ? "active" : ""} onClick={() => setActiveView("suppliers")}><span>◇</span><b>Nhà cung cấp</b></button>
+          <a href="/admin/import" className="admin-import-link"><span>⇣</span><b>Nhập & đối chiếu</b></a>
+          <a href="/admin/trace"><span>◎</span><b>Sản phẩm & lô</b></a>
+          <a href="/admin/settings/ai"><span>✦</span><b>Cài đặt AI</b></a>
           <button className={activeView === "qr" ? "active" : ""} onClick={() => setActiveView("qr")}><span>▦</span><b>Thư viện QR</b></button>
           <button className={activeView === "audit" ? "active" : ""} onClick={() => setActiveView("audit")}><span>◷</span><b>Nhật ký</b></button>
         </nav>
@@ -574,6 +624,7 @@ export default function AdminDashboard({
                 </label>
               ))}
               <div className="form-section-title wide"><span>EN</span><div><b>Nội dung tiếng Anh</b><small>Chỉ nhập bản dịch đã được kiểm tra</small></div></div>
+              <div className="wide ai-translate"><button type="button" className="secondary-btn" disabled={busy} onClick={draftTranslation}>AI gợi ý bản dịch EN</button><small>Chỉ dịch sản phẩm, bảo quản, hạn sử dụng và ghi chú. Tên pháp nhân, địa chỉ giữ nguyên để tránh sai thông tin pháp lý.</small></div>
               {[
                 ["nameEn", "Supplier name (English)"],
                 ["productNameEn", "Product group (English)"],
@@ -723,6 +774,7 @@ export default function AdminDashboard({
               <form
                 className="document-form edit-panel"
                 key={editingDocument?.id || "new"}
+                ref={documentFormRef}
                 onSubmit={saveDocument}
               >
                 <div className="subhead">
@@ -794,6 +846,11 @@ export default function AdminDashboard({
                     required={!editingDocument}
                   />
                 </label>
+                <div className="ai-document-tools">
+                  <label className="check-label"><input name="aiConsent" type="checkbox" /><span>Tôi xác nhận Sunfood có quyền gửi tệp này đến dịch vụ AI để phân tích; kết quả chỉ là bản nháp nội bộ.</span></label>
+                  <button type="button" className="secondary-btn" disabled={aiBusy || busy} onClick={analyzeDocument}>{aiBusy ? 'Đang đọc hồ sơ…' : 'AI đọc & đối chiếu hồ sơ'}</button>
+                  {aiSuggestion && <div className="ai-document-result"><b>Đề xuất cần kiểm tra</b><p>{aiSuggestion.title || 'Chưa đọc được tiêu đề'} · Số {aiSuggestion.documentNumber || 'chưa đọc được'} · Cấp {aiSuggestion.issuedAt || '—'} · Hết hạn {aiSuggestion.expiresAt || '—'}</p><p>Đơn vị: {aiSuggestion.supplierName || '—'} · MST: {aiSuggestion.taxCode || '—'}</p>{aiSuggestion.evidence && <small>Nội dung nhận diện: “{aiSuggestion.evidence}”</small>}{aiSuggestion.warnings.length > 0 && <ul>{aiSuggestion.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>}<button type="button" className="secondary-btn" onClick={applyAiSuggestion}>Điền trường đề xuất</button></div>}
+                </div>
                 <label className="check-label">
                   <input
                     name="isPublic"

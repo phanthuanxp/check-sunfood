@@ -105,7 +105,28 @@ Checklist chuyển VPS, PostgreSQL, object storage, DNS và rollback nằm trong
 
 Prisma tự dùng schema SQLite khi `DATABASE_URL=file:...` và schema PostgreSQL khi URL bắt đầu bằng `postgresql://` hoặc `postgres://`. Production chạy migration có version bằng `npm run db:migrate`.
 
+`npm run db:seed` chỉ tạo mã NCC còn thiếu. Chạy lại seed trong lần deploy sau không ghi đè thông tin hoặc trạng thái xác minh mà admin đã chỉnh. Muốn sửa dữ liệu NCC hiện có, hãy dùng giao diện admin và đối chiếu hồ sơ nội bộ.
+
+## Nhập nguồn & truy xuất theo lô (localhost)
+
+- `/admin/import`: đọc từng nguồn hoặc lần lượt 23 QR SmartCheck đã có, lưu bản nháp có URL và SHA-256 của trang nguồn. Admin chọn từng trường, chỉnh sửa và duyệt; bản nháp không tự ghi đè supplier hay đổi trạng thái `VERIFIED`. Không sao chép tệp pháp lý, ảnh hoặc đường dẫn hồ sơ thành tệp public.
+- NCC mới chỉ được tạo sau khi nhập URL nguồn và duyệt tên. Parser hiện hỗ trợ URL `https://truyxuat.smartcheck.vn/check/<mã>`; QR từ nhà cung cấp khác cần bộ trích xuất riêng sau khi xem nguồn, không gửi URL tuỳ ý từ server.
+- `/admin/trace`: tạo sản phẩm, lô và sự kiện ở chế độ riêng tư. Công khai phải đi theo thứ tự NCC đã xác minh → sản phẩm → lô → từng sự kiện; chặn ngày sự kiện và ngày sản xuất trong tương lai.
+- QR lô (khi công khai) trỏ tới `/lot/<publicId>` bất biến và tải PNG/SVG ở `/api/qr/lot/<publicId>`. Giữ `publicId` khi chuyển database/backup để tem đã in không đổi đích. QR nhà cung cấp `/qr/NCC-xx` vẫn giữ nguyên.
+- Kiểm thử parser bằng `npm run test:import`; production có migration version tại `prisma/migrations-postgresql/20260922000000_trace_and_import`.
+
+Đã thu thập 23 bản nháp trên SQLite localhost ngày 22/09/2026; đây là dữ liệu chưa được Sunfood duyệt và không nằm trong Git. Sao lưu `prisma/dev.db` trước khi chuyển dữ liệu thật sang PostgreSQL. Không dùng dữ liệu mẫu GoTrace làm chứng cứ.
+
 ## Lưu ý dữ liệu
+
+## Trợ lý AI trên localhost
+
+- Quản trị viên cấu hình khóa và model tại `/admin/settings/ai`. Khóa được mã hóa AES-256-GCM trong database, không hiển thị lại; `AUTH_SECRET` (hoặc `INTEGRATION_ENCRYPTION_KEY`) phải ổn định, dài ít nhất 32 ký tự và cần được sao lưu an toàn. `OPENAI_API_KEY` trong `.env` vẫn là phương án dự phòng phía server; không dùng tiền tố `NEXT_PUBLIC_`.
+- Nút **Kiểm tra kết nối** chỉ kiểm tra quyền truy cập các model đã chọn qua API Models, chưa gửi hồ sơ. Sau khi kết nối thành công, quản trị viên có thể tải PDF/JPG/PNG lên màn hình hồ sơ và chấp thuận gửi tệp để AI đọc thành bản nháp đối chiếu.
+- Admin → Nhà cung cấp → Hồ sơ → chọn PDF/JPG/PNG → xác nhận quyền gửi tệp → **AI đọc & đối chiếu hồ sơ**. Mặc định dùng `gpt-5.6-terra`. AI chỉ trả tiêu đề, số giấy, ngày, tên/MST, trích đoạn và cảnh báo; admin bấm **Điền trường đề xuất**, so bản gốc rồi mới lưu. Không tự xác minh/công khai tài liệu. Chỉ gửi tệp khi admin chủ động đồng ý.
+- `/admin/import` có nút **AI gợi ý điểm cần kiểm tra** để so sánh trường trong QR nguồn với NCC hiện lưu. Biểu mẫu NCC có **AI gợi ý bản dịch EN** cho các mô tả; tên pháp nhân và địa chỉ không được tự dịch. Cả hai chỉ đề xuất, không tự duyệt hoặc tự ghi dữ liệu.
+- Trang `/qr/NCC-xx` có khung hỏi đáp Việt/Anh. Mặc định **tắt** (`AI_PUBLIC_QA_ENABLED=false`). Chỉ bật sau khi dữ liệu NCC được Sunfood xác minh, tài liệu công khai đã rà soát và đã có giới hạn request thích hợp trên reverse proxy. Mặc định dùng `gpt-5.6-luna`; gửi đến model duy nhất trường NCC đã lưu và metadata của tệp public, không gửi tệp nội bộ. Câu trả lời phải có liên kết nguồn hoặc thông báo thiếu dữ liệu.
+- Các phép tính ngày hết hạn tiếp tục dùng logic ứng dụng, không giao AI quyết định hiệu lực pháp lý. Trước production cần kiểm thử với tài liệu thật được phép xử lý, giới hạn chi phí, giám sát câu trả lời và rate limit dùng chung giữa nhiều instance. `npm run test:ai` kiểm tra quy tắc dữ liệu đầu ra; khi chưa có API key không thể thử call model thật.
 
 Seed hiện có 23 NCC theo các link SmartCheck đã được đối chiếu. Một số trang SmartCheck không hiển thị đầy đủ tên NCC trong HTML công khai; dữ liệu đó cần được đối chiếu lại với hồ sơ nội bộ trước khi đưa production.
 

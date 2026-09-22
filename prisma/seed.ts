@@ -5,11 +5,12 @@ async function main() {
   for (const supplier of suppliers) {
     await prisma.supplier.upsert({
       where: { code: supplier.code },
-      update: supplier,
+      // Seed only missing codes. Admin-reviewed records must survive redeploys.
+      update: {},
       create: supplier
     });
   }
-  console.log(`Seeded ${suppliers.length} suppliers.`);
+  console.log(`Ensured ${suppliers.length} supplier codes exist; existing records were not changed.`);
 }
 
 main().finally(() => prisma.$disconnect());

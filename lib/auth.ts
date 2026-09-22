@@ -9,7 +9,9 @@ function secret() {
 }
 
 function sign(value: string) {
-  return createHmac('sha256', secret()).update(value).digest('base64url');
+  // Changing the admin password must also invalidate previously issued sessions.
+  const signingKey = createHmac('sha256', secret()).update(process.env.ADMIN_PASSWORD || 'change-me-local').digest();
+  return createHmac('sha256', signingKey).update(value).digest('base64url');
 }
 
 export function createSessionToken(username: string) {

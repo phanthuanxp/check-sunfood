@@ -16,7 +16,7 @@ async function expectResponse(path, expectedStatus = 200) {
 const health = await expectResponse('/api/health');
 if (health?.ok) {
   const body = await health.json();
-  if (body.checks?.suppliers !== 23 || body.checks?.missingCodes?.length) failures.push('/api/health: bộ mã NCC chưa đầy đủ');
+  if (body.checks?.requiredSupplierCodes !== 23 || body.checks?.suppliers < 23 || body.checks?.missingCodes?.length) failures.push('/api/health: bộ mã NCC-01 đến NCC-23 chưa đầy đủ');
 }
 
 await expectResponse('/');

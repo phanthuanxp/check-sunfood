@@ -31,6 +31,7 @@ model Supplier {
   updatedAt       DateTime   @updatedAt
   documents       Document[]
   auditLogs       AuditLog[]
+  products        Product[]
 
   @@index([code])
   @@index([name])
@@ -79,4 +80,76 @@ model AuditLog {
 
   @@index([supplierId])
   @@index([createdAt])
+}
+
+model ImportDraft {
+  id          Int       @id @default(autoincrement())
+  code        String
+  sourceUrl   String
+  sourceHash  String
+  payload     String
+  status      String    @default("PENDING")
+  fetchedAt   DateTime  @default(now())
+  reviewedAt  DateTime?
+  reviewNotes String?
+
+  @@index([code, fetchedAt])
+}
+
+model AiIntegrationSettings {
+  id              Int      @id @default(1)
+  encryptedApiKey String?
+  documentModel   String   @default("gpt-5.6-terra")
+  helperModel     String   @default("gpt-5.6-luna")
+  publicQaEnabled Boolean  @default(false)
+  updatedAt       DateTime @updatedAt
+}
+
+model Product {
+  id         Int       @id @default(autoincrement())
+  supplierId Int
+  name       String
+  sku        String?
+  gtin       String?
+  origin     String?
+  unit       String?
+  storage    String?
+  isPublic   Boolean   @default(false)
+  supplier   Supplier  @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  batches    Batch[]
+
+  @@index([supplierId])
+}
+
+model Batch {
+  id         Int          @id @default(autoincrement())
+  publicId   String       @unique @default(cuid())
+  productId  Int
+  code       String
+  receivedAt DateTime?
+  producedAt DateTime?
+  expiresAt  DateTime?
+  sourceSystem String @default("LOCAL")
+  sourceKey String? @unique
+  sourceSyncedAt DateTime?
+  everPublished Boolean @default(false)
+  isPublic   Boolean      @default(false)
+  product    Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  events     TraceEvent[]
+
+  @@unique([productId, code])
+}
+
+model TraceEvent {
+  id         Int      @id @default(autoincrement())
+  batchId    Int
+  occurredAt DateTime
+  stage      String
+  title      String
+  details    String?
+  location   String?
+  isPublic   Boolean  @default(false)
+  batch      Batch    @relation(fields: [batchId], references: [id], onDelete: Restrict)
+
+  @@index([batchId, occurredAt])
 }
