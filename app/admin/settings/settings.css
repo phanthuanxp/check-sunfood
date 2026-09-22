@@ -1,0 +1,28 @@
+.hc-settings-page{color:#183e2a}
+.hc-settings-card{max-width:820px;margin:0 auto 18px;padding:clamp(20px,4vw,32px);border:1px solid #dce9df;border-radius:20px;background:#fff;box-shadow:0 14px 45px #1448290b}
+.hc-settings-card h2{margin:0 0 10px}
+.hc-settings-card p{line-height:1.6}
+.hc-settings-card a{color:#08754b;font-weight:700}
+.hc-settings-status{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-bottom:18px;margin-bottom:22px;border-bottom:1px solid #e1ebe3;flex-wrap:wrap}
+.hc-settings-status span{padding:7px 11px;border-radius:999px;font-size:12px;font-weight:800}
+.hc-settings-status .ready{background:#e3f6e9;color:#0b6e40}
+.hc-settings-status .missing{background:#fff0e3;color:#925318}
+.hc-settings-card form{display:grid;gap:20px}
+.hc-settings-card form>label{display:grid;gap:8px;font-weight:800}
+.hc-settings-card label small{display:block;color:#61786a;font-weight:400;line-height:1.5}
+.hc-settings-card input[type=password],.hc-settings-card input[type=text]{width:100%;min-height:48px;padding:10px 13px;border:1px solid #cadfd0;border-radius:11px;background:#fff;color:#183e2a;font:inherit}
+.hc-settings-actions{display:flex;flex-wrap:wrap;gap:10px}
+.hc-settings-actions button{padding:11px 16px;border:1px solid #08754b;border-radius:10px;background:#08754b;color:#fff;font:inherit;font-weight:800;cursor:pointer}
+.hc-settings-actions button.outline{background:#fff;color:#08754b}
+.hc-settings-actions button.danger{border-color:#b46e5a;background:#fff;color:#a13d2b}
+.hc-settings-actions button:disabled{opacity:.5;cursor:not-allowed}
+.hc-settings-warning,.hc-settings-message{padding:12px 14px;border-radius:10px;background:#fff6e7;color:#74491b}
+.hc-settings-message{margin:20px 0 0;background:#eaf7ef;color:#1d6540}
+.hc-settings-meta{display:grid;gap:6px;font-size:13px;color:#4c6357;padding:14px 16px;border-radius:12px;background:#f5faf6}
+@media(max-width:560px){.hc-settings-status{align-items:flex-start;flex-direction:column}.hc-settings-actions button{width:100%}}
+
+.admin-settings-tab-intro{max-width:820px;margin:0 auto 18px;color:#5f7568;line-height:1.6}
+
+.admin-settings-tabs{max-width:820px;margin:0 auto 18px;display:flex;gap:8px;flex-wrap:wrap}
+.admin-settings-tabs button{padding:9px 16px;border:1px solid #dce9df;border-radius:999px;background:#fff;color:#3f5749;font:inherit;font-weight:700;font-size:13px;cursor:pointer}
+.admin-settings-tabs button.active{background:#08754b;border-color:#08754b;color:#fff}

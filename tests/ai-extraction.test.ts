@@ -14,3 +14,11 @@ test('rejects unsupported categories and warns when expiry precedes issuance', (
   assert.equal(result.category, null);
   assert.match(result.warnings.join(' '), /trước ngày cấp/);
 });
+
+test('keeps only known confidence levels and defaults missing confidence to null', () => {
+  const result = validateExtraction({ title: 'Giấy chứng nhận', category: 'FOOD_SAFETY', supplierName: null, taxCode: null, documentNumber: null, issuedAt: null, expiresAt: null, evidence: null, warnings: [], confidence: { title: 'HIGH', category: 'GUESS', issuedAt: null } });
+  assert.equal(result.confidence.title, 'HIGH');
+  assert.equal(result.confidence.category, null);
+  assert.equal(result.confidence.issuedAt, null);
+  assert.equal(result.confidence.expiresAt, null);
+});

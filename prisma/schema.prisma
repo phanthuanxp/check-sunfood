@@ -105,6 +105,22 @@ model AiIntegrationSettings {
   updatedAt       DateTime @updatedAt
 }
 
+model HanoiCheckIntegrationSettings {
+  id                    Int       @id @default(1)
+  baseUrl               String?
+  traceConnectionCode   String?
+  encryptedClientId     String?
+  encryptedClientSecret String?
+  encryptedHmacSecret   String?
+  encryptedAccessToken  String?
+  encryptedRefreshToken String?
+  accessTokenExpiresAt  DateTime?
+  lastSyncedAt          DateTime?
+  lastSyncStatus        String?
+  lastSyncCount         Int?
+  updatedAt             DateTime  @updatedAt
+}
+
 model Product {
   id         Int       @id @default(autoincrement())
   supplierId Int
@@ -114,10 +130,12 @@ model Product {
   origin     String?
   unit       String?
   storage    String?
+  hygieneCertNumber String?
   isPublic   Boolean   @default(false)
   supplier   Supplier  @relation(fields: [supplierId], references: [id], onDelete: Restrict)
   batches    Batch[]
 
+  @@unique([supplierId, sku])
   @@index([supplierId])
 }
 
@@ -132,6 +150,8 @@ model Batch {
   sourceSystem String @default("LOCAL")
   sourceKey String? @unique
   sourceSyncedAt DateTime?
+  sourceTraceUrl String?
+  sourcePayload  String?
   everPublished Boolean @default(false)
   isPublic   Boolean      @default(false)
   product    Product      @relation(fields: [productId], references: [id], onDelete: Restrict)

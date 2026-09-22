@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     file.type === 'application/pdf'
       ? { type: 'input_file', filename: 'supplier-document.pdf', file_data: `data:application/pdf;base64,${bytes.toString('base64')}` }
       : { type: 'input_image', image_url: `data:${file.type};base64,${bytes.toString('base64')}`, detail: 'high' },
-    { type: 'input_text', text: `Trích xuất hồ sơ để quản trị viên đối chiếu. NCC đang chọn: ${supplierName}; MST đã lưu: ${supplierTaxCode || 'chưa có'}. Trả null nếu không đọc được. Ngày theo YYYY-MM-DD. evidence là trích đoạn ngắn nhìn thấy trên tệp. Ghi cảnh báo nếu tên/MST không khớp hoặc thông tin mơ hồ.` },
+    { type: 'input_text', text: `Trích xuất hồ sơ để quản trị viên đối chiếu. NCC đang chọn: ${supplierName}; MST đã lưu: ${supplierTaxCode || 'chưa có'}. Trả null nếu không đọc được. Ngày theo YYYY-MM-DD. evidence là trích đoạn ngắn nhìn thấy trên tệp. Ghi cảnh báo nếu tên/MST không khớp hoặc thông tin mơ hồ. Với mỗi trường title/category/issuedAt/expiresAt, chấm confidence: HIGH nếu đọc rõ trực tiếp trên tệp, MEDIUM nếu phải suy luận từ ngữ cảnh, LOW nếu chỉ đoán hoặc mờ/khó đọc; null nếu không có giá trị.` },
   ];
   try {
     const { documentModel } = await getAiRuntimeSettings();

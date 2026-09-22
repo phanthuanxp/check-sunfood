@@ -4,6 +4,11 @@
 
 import { FormEvent, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import type { DataWarning } from "@/lib/data-warnings";
+import TraceWorkspace from "./trace/TraceWorkspace";
+import AccountSettingsForm from "./settings/account/AccountSettingsForm";
+import AiSettingsForm from "./settings/ai/AiSettingsForm";
+import HanoiCheckSettingsForm from "./settings/hanoicheck/HanoiCheckSettingsForm";
 
 type Version = {
   id: number;
@@ -44,7 +49,12 @@ type Supplier = {
   documents: DocumentItem[];
 };
 type Audit = { id: number; summary: string; createdAt: string };
-type AiSuggestion = { title: string | null; category: string | null; supplierName: string | null; taxCode: string | null; documentNumber: string | null; issuedAt: string | null; expiresAt: string | null; evidence: string | null; warnings: string[] };
+type Confidence = "HIGH" | "MEDIUM" | "LOW" | null;
+type AiSuggestion = { title: string | null; category: string | null; supplierName: string | null; taxCode: string | null; documentNumber: string | null; issuedAt: string | null; expiresAt: string | null; evidence: string | null; warnings: string[]; confidence: Record<"title" | "category" | "issuedAt" | "expiresAt", Confidence> };
+type DocFieldKey = "title" | "category" | "issuedAt" | "expiresAt";
+const emptyDocFields: Record<DocFieldKey, string> = { title: "", category: "BUSINESS_LICENSE", issuedAt: "", expiresAt: "" };
+const confidenceLabels: Record<NonNullable<Confidence>, string> = { HIGH: "Tin cậy cao", MEDIUM: "Cần kiểm tra", LOW: "Độ tin cậy thấp" };
+const docFieldLabels: Record<DocFieldKey, string> = { title: "Tiêu đề", category: "Phân loại", issuedAt: "Ngày cấp", expiresAt: "Ngày hết hạn" };
 
 const emptySupplier = {
   code: "",
@@ -98,18 +108,25 @@ function expiry(expiresAt: string | null) {
   return { key: "valid", label: "Còn hiệu lực", days };
 }
 
-type AdminView = "overview" | "suppliers" | "qr" | "audit";
+type AdminView = "overview" | "suppliers" | "qr" | "audit" | "warnings" | "batches" | "settings";
+type SettingsTab = "account" | "ai" | "hanoicheck";
+const severityLabels: Record<DataWarning["severity"], string> = { critical: "Khẩn cấp", warning: "Cần chú ý", info: "Tham khảo" };
 
 export default function AdminDashboard({
   initialSuppliers,
   auditLogs,
+  warnings,
+  adminUsername,
   initialView = "overview",
 }: {
   initialSuppliers: Supplier[];
   auditLogs: Audit[];
+  warnings: DataWarning[];
+  adminUsername: string;
   initialView?: AdminView;
 }) {
   const router = useRouter();
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("account");
   const [suppliers] = useState(initialSuppliers);
   const [query, setQuery] = useState("");
   const [expiryFilter, setExpiryFilter] = useState("all");
@@ -129,6 +146,7 @@ export default function AdminDashboard({
   const documentFormRef = useRef<HTMLFormElement>(null);
   const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
+  const [docFields, setDocFields] = useState<Record<DocFieldKey, string>>(emptyDocFields);
 
   const docs = useMemo(
     () =>
@@ -218,6 +236,7 @@ export default function AdminDashboard({
     setEditingDocument(null);
     setShowDocumentForm(false);
     setAiSuggestion(null);
+    setDocFields(emptyDocFields);
     setMessage("");
   }
 
@@ -306,14 +325,12 @@ export default function AdminDashboard({
     finally { setBusy(false); }
   }
 
-  function applyAiSuggestion() {
-    if (!aiSuggestion || !documentFormRef.current) return;
-    for (const key of ['title', 'category', 'issuedAt', 'expiresAt'] as const) {
-      const value = aiSuggestion[key];
-      const element = documentFormRef.current.elements.namedItem(key);
-      if (value && (element instanceof HTMLInputElement || element instanceof HTMLSelectElement)) element.value = value;
-    }
-    setMessage('Đã điền bản nháp vào biểu mẫu. Anh hãy đối chiếu bản gốc trước khi lưu; AI không tự công khai hồ sơ.');
+  function applyField(key: DocFieldKey) {
+    if (!aiSuggestion) return;
+    const value = aiSuggestion[key];
+    if (!value) return;
+    setDocFields((current) => ({ ...current, [key]: value }));
+    setMessage(`Đã chấp nhận đề xuất AI cho trường "${docFieldLabels[key]}". Anh hãy đối chiếu bản gốc trước khi lưu; AI không tự công khai hồ sơ.`);
   }
 
   async function removeDocument(document: DocumentItem) {
@@ -393,7 +410,22 @@ export default function AdminDashboard({
     suppliers: ["Quản lý nhà cung cấp", "Xem, chỉnh sửa, cập nhật hồ sơ và trạng thái từng nhà cung cấp."],
     qr: ["Thư viện mã QR", "Quản lý và tải mã truy xuất riêng của từng nhà cung cấp."],
     audit: ["Nhật ký hoạt động", "Theo dõi các thay đổi dữ liệu gần nhất trong hệ thống."],
+    warnings: ["Cảnh báo dữ liệu", "Quy tắc xác định tự động: hồ sơ hết hạn, thiếu dữ liệu, mã số thuế/tên trùng lặp. Không dùng AI cho các quyết định này."],
+    batches: ["QL lô nhập hàng", "Đồng bộ, duyệt công khai và in QR cho từng lô nhập hàng từ HanoiCheck."],
+    settings: ["Cài đặt", "Tài khoản, cấu hình AI, kết nối HanoiCheck và các tác vụ cấu hình khác của dự án."],
   }[activeView];
+  const warningStats = useMemo(() => ({
+    critical: warnings.filter((w) => w.severity === "critical").length,
+    warning: warnings.filter((w) => w.severity === "warning").length,
+    conflicts: warnings.filter((w) => w.rule === "DUPLICATE_TAX_CODE" || w.rule === "DUPLICATE_NAME").length,
+  }), [warnings]);
+
+  function openWarning(warning: DataWarning) {
+    const supplier = suppliers.find((s) => s.code === warning.code);
+    if (!supplier) return;
+    if (warning.rule === "MISSING_DOCUMENTS" || warning.rule.startsWith("DOCUMENT_")) openDocuments(supplier);
+    else editSupplier(supplier);
+  }
 
   return (
     <main className="admin-shell">
@@ -408,11 +440,11 @@ export default function AdminDashboard({
             <span>⌂</span><b>Tổng quan</b>
           </button>
           <button className={activeView === "suppliers" ? "active" : ""} onClick={() => setActiveView("suppliers")}><span>◇</span><b>Nhà cung cấp</b></button>
-          <a href="/admin/import" className="admin-import-link"><span>⇣</span><b>Nhập & đối chiếu</b></a>
-          <a href="/admin/trace"><span>◎</span><b>Sản phẩm & lô</b></a>
-          <a href="/admin/settings/ai"><span>✦</span><b>Cài đặt AI</b></a>
+          <button className={activeView === "batches" ? "active" : ""} onClick={() => setActiveView("batches")}><span>◎</span><b>QL lô nhập hàng</b></button>
           <button className={activeView === "qr" ? "active" : ""} onClick={() => setActiveView("qr")}><span>▦</span><b>Thư viện QR</b></button>
+          <button className={activeView === "warnings" ? "active" : ""} onClick={() => setActiveView("warnings")}><span>⚠</span><b>Cảnh báo dữ liệu</b>{warningStats.critical > 0 && <em className="nav-badge">{warningStats.critical}</em>}</button>
           <button className={activeView === "audit" ? "active" : ""} onClick={() => setActiveView("audit")}><span>◷</span><b>Nhật ký</b></button>
+          <button className={activeView === "settings" ? "active" : ""} onClick={() => setActiveView("settings")}><span>⚙</span><b>Cài đặt</b></button>
         </nav>
         <div className="sidebar-account"><div className="admin-avatar">A</div><div><b>Quản trị viên</b><small>Administrator</small></div><button onClick={logout} title="Đăng xuất">↪</button></div>
       </aside>
@@ -458,7 +490,30 @@ export default function AdminDashboard({
         </div>
         <section className={`overview-detail admin-view ${activeView === "overview" ? "" : "is-hidden"}`}>
           <article className="panel system-health"><div className="panel-head"><div><p className="panel-kicker">HỆ THỐNG</p><h2>Tình trạng dữ liệu</h2></div><span className="health-online">● Hoạt động ổn định</span></div><div className="health-list"><div><span>Cơ sở dữ liệu</span><b>SQLite localhost</b></div><div><span>Nhà cung cấp đã xác minh</span><b>{stats.verified}/{stats.total}</b></div><div><span>Hồ sơ được công khai</span><b>{stats.publicDocs}/{docs.length}</b></div><div><span>URL QR ổn định</span><b>NCC-01 → NCC-23</b></div></div></article>
-          <article className="panel attention-panel"><div className="panel-head"><div><p className="panel-kicker">CẦN CHÚ Ý</p><h2>Ưu tiên xử lý</h2></div></div><div className="attention-list"><button onClick={() => { setExpiryFilter("missing"); setActiveView("suppliers"); }}><span className="attention-icon critical">!</span><div><b>{stats.missing} nhà cung cấp thiếu hồ sơ</b><small>Cần bổ sung tài liệu được phép lưu trữ</small></div><strong>→</strong></button><button onClick={() => { setExpiryFilter("expired"); setActiveView("suppliers"); }}><span className="attention-icon danger">×</span><div><b>{stats.expired} hồ sơ đã hết hạn</b><small>Kiểm tra và cập nhật hồ sơ thay thế</small></div><strong>→</strong></button><button onClick={() => { setExpiryFilter("warning"); setActiveView("suppliers"); }}><span className="attention-icon warning">◷</span><div><b>{stats.warning} hồ sơ sắp hết hạn</b><small>Trong khoảng cảnh báo 90 ngày</small></div><strong>→</strong></button></div></article>
+          <article className="panel attention-panel"><div className="panel-head"><div><p className="panel-kicker">CẦN CHÚ Ý</p><h2>Ưu tiên xử lý</h2></div></div><div className="attention-list"><button onClick={() => { setExpiryFilter("missing"); setActiveView("suppliers"); }}><span className="attention-icon critical">!</span><div><b>{stats.missing} nhà cung cấp thiếu hồ sơ</b><small>Cần bổ sung tài liệu được phép lưu trữ</small></div><strong>→</strong></button><button onClick={() => { setExpiryFilter("expired"); setActiveView("suppliers"); }}><span className="attention-icon danger">×</span><div><b>{stats.expired} hồ sơ đã hết hạn</b><small>Kiểm tra và cập nhật hồ sơ thay thế</small></div><strong>→</strong></button><button onClick={() => { setExpiryFilter("warning"); setActiveView("suppliers"); }}><span className="attention-icon warning">◷</span><div><b>{stats.warning} hồ sơ sắp hết hạn</b><small>Trong khoảng cảnh báo 90 ngày</small></div><strong>→</strong></button><button onClick={() => setActiveView("warnings")}><span className="attention-icon critical">⚠</span><div><b>{warningStats.conflicts} mã số thuế/tên trùng lặp</b><small>Đối chiếu để loại trừ lỗi ánh xạ dữ liệu</small></div><strong>→</strong></button></div></article>
+        </section>
+        <section className={`panel admin-view ${activeView === "warnings" ? "" : "is-hidden"}`} id="warnings">
+          <div className="panel-head">
+            <div>
+              <p className="panel-kicker">QUY TẮC TỰ ĐỘNG</p>
+              <h2>{warnings.length} cảnh báo · {warningStats.critical} khẩn cấp</h2>
+            </div>
+          </div>
+          <div className="warning-list">
+            {warnings.map((warning, index) => (
+              <button key={`${warning.code}-${warning.rule}-${index}`} className={`warning-row ${warning.severity}`} onClick={() => openWarning(warning)}>
+                <span className={`attention-icon ${warning.severity === "critical" ? "danger" : warning.severity === "warning" ? "warning" : "neutral"}`}>
+                  {warning.severity === "critical" ? "!" : warning.severity === "warning" ? "◷" : "i"}
+                </span>
+                <div>
+                  <b>{warning.code} · {severityLabels[warning.severity]}</b>
+                  <small>{warning.message}</small>
+                </div>
+                <strong>→</strong>
+              </button>
+            ))}
+            {!warnings.length && <p className="empty">Không có cảnh báo dữ liệu nào theo quy tắc hiện có.</p>}
+          </div>
         </section>
         <section className={`panel admin-view ${activeView === "suppliers" ? "" : "is-hidden"}`} id="suppliers">
           <div className="panel-head">
@@ -581,6 +636,19 @@ export default function AdminDashboard({
             <p className="empty">Chưa có hoạt động chỉnh sửa.</p>
           )}
         </section>
+        <section className={`admin-view ${activeView === "batches" ? "" : "is-hidden"}`}>
+          {activeView === "batches" && <TraceWorkspace />}
+        </section>
+        <section className={`admin-view ${activeView === "settings" ? "" : "is-hidden"}`}>
+          <div className="admin-settings-tabs">
+            <button className={settingsTab === "account" ? "active" : ""} onClick={() => setSettingsTab("account")}>Tài khoản</button>
+            <button className={settingsTab === "ai" ? "active" : ""} onClick={() => setSettingsTab("ai")}>Cấu hình AI</button>
+            <button className={settingsTab === "hanoicheck" ? "active" : ""} onClick={() => setSettingsTab("hanoicheck")}>Kết nối HanoiCheck</button>
+          </div>
+          {settingsTab === "account" && <AccountSettingsForm username={adminUsername} />}
+          {settingsTab === "ai" && <AiSettingsForm />}
+          {settingsTab === "hanoicheck" && <HanoiCheckSettingsForm />}
+        </section>
       </section>
 
       {showSupplierForm && (
@@ -694,6 +762,8 @@ export default function AdminDashboard({
                 className="primary-btn"
                 onClick={() => {
                   setEditingDocument(null);
+                  setDocFields(emptyDocFields);
+                  setAiSuggestion(null);
                   setShowDocumentForm(true);
                 }}
               >
@@ -748,6 +818,8 @@ export default function AdminDashboard({
                       <button
                         onClick={() => {
                           setEditingDocument(d);
+                          setDocFields({ title: d.title, category: d.category, issuedAt: d.issuedAt?.slice(0, 10) || "", expiresAt: d.expiresAt?.slice(0, 10) || "" });
+                          setAiSuggestion(null);
                           setShowDocumentForm(true);
                         }}
                       >
@@ -790,7 +862,8 @@ export default function AdminDashboard({
                   Tiêu đề
                   <input
                     name="title"
-                    defaultValue={editingDocument?.title || ""}
+                    value={docFields.title}
+                    onChange={(event) => setDocFields((current) => ({ ...current, title: event.target.value }))}
                     required
                   />
                 </label>
@@ -802,9 +875,8 @@ export default function AdminDashboard({
                   Phân loại
                   <select
                     name="category"
-                    defaultValue={
-                      editingDocument?.category || "BUSINESS_LICENSE"
-                    }
+                    value={docFields.category}
+                    onChange={(event) => setDocFields((current) => ({ ...current, category: event.target.value }))}
                   >
                     {Object.entries(categoryLabels).map(([value, label]) => (
                       <option value={value} key={value}>
@@ -819,9 +891,8 @@ export default function AdminDashboard({
                     <input
                       name="issuedAt"
                       type="date"
-                      defaultValue={
-                        editingDocument?.issuedAt?.slice(0, 10) || ""
-                      }
+                      value={docFields.issuedAt}
+                      onChange={(event) => setDocFields((current) => ({ ...current, issuedAt: event.target.value }))}
                     />
                   </label>
                   <label>
@@ -829,9 +900,8 @@ export default function AdminDashboard({
                     <input
                       name="expiresAt"
                       type="date"
-                      defaultValue={
-                        editingDocument?.expiresAt?.slice(0, 10) || ""
-                      }
+                      value={docFields.expiresAt}
+                      onChange={(event) => setDocFields((current) => ({ ...current, expiresAt: event.target.value }))}
                     />
                   </label>
                 </div>
@@ -849,7 +919,42 @@ export default function AdminDashboard({
                 <div className="ai-document-tools">
                   <label className="check-label"><input name="aiConsent" type="checkbox" /><span>Tôi xác nhận Sunfood có quyền gửi tệp này đến dịch vụ AI để phân tích; kết quả chỉ là bản nháp nội bộ.</span></label>
                   <button type="button" className="secondary-btn" disabled={aiBusy || busy} onClick={analyzeDocument}>{aiBusy ? 'Đang đọc hồ sơ…' : 'AI đọc & đối chiếu hồ sơ'}</button>
-                  {aiSuggestion && <div className="ai-document-result"><b>Đề xuất cần kiểm tra</b><p>{aiSuggestion.title || 'Chưa đọc được tiêu đề'} · Số {aiSuggestion.documentNumber || 'chưa đọc được'} · Cấp {aiSuggestion.issuedAt || '—'} · Hết hạn {aiSuggestion.expiresAt || '—'}</p><p>Đơn vị: {aiSuggestion.supplierName || '—'} · MST: {aiSuggestion.taxCode || '—'}</p>{aiSuggestion.evidence && <small>Nội dung nhận diện: “{aiSuggestion.evidence}”</small>}{aiSuggestion.warnings.length > 0 && <ul>{aiSuggestion.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>}<button type="button" className="secondary-btn" onClick={applyAiSuggestion}>Điền trường đề xuất</button></div>}
+                  {aiSuggestion && (
+                    <div className="ai-document-result">
+                      <b>Đề xuất cần kiểm tra — chấp nhận từng trường, không tự điền hàng loạt</b>
+                      <div className="ai-field-review">
+                        <div className="ai-field-row ai-field-head"><span>Trường</span><span>Đang nhập</span><span>AI đề xuất</span><span /></div>
+                        {(["title", "category", "issuedAt", "expiresAt"] as DocFieldKey[]).map((key) => {
+                          const proposedRaw = aiSuggestion[key];
+                          const currentRaw = docFields[key];
+                          const proposedLabel = key === "category" ? (proposedRaw ? categoryLabels[proposedRaw] || proposedRaw : null) : proposedRaw;
+                          const currentLabel = key === "category" ? categoryLabels[currentRaw] || currentRaw : currentRaw;
+                          const differs = Boolean(proposedRaw) && proposedRaw !== currentRaw;
+                          const confidence = aiSuggestion.confidence[key];
+                          return (
+                            <div className={`ai-field-row${differs ? " conflict" : ""}`} key={key}>
+                              <span className="ai-field-label">{docFieldLabels[key]}</span>
+                              <span>{currentLabel || "—"}</span>
+                              <span>
+                                {proposedLabel || "Không đọc được"}
+                                {confidence && <em className={`confidence-badge ${confidence.toLowerCase()}`}>{confidenceLabels[confidence]}</em>}
+                              </span>
+                              <button type="button" className="secondary-btn" disabled={!differs} onClick={() => applyField(key)}>
+                                {differs ? "Chấp nhận" : "Khớp"}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p>Số hồ sơ trên tài liệu: {aiSuggestion.documentNumber || "—"} · Đơn vị ghi trên tài liệu: {aiSuggestion.supplierName || "—"} · MST: {aiSuggestion.taxCode || "—"}</p>
+                      {aiSuggestion.evidence && <small>Trích dẫn nhìn thấy trên tệp: “{aiSuggestion.evidence}”</small>}
+                      {aiSuggestion.warnings.length > 0 && (
+                        <ul className="ai-warnings">
+                          {aiSuggestion.warnings.map((warning, index) => <li key={index}>{warning}</li>)}
+                        </ul>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <label className="check-label">
                   <input

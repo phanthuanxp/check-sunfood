@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import './settings.css';
 
 type Status = {
   hasKey: boolean;
@@ -95,8 +96,8 @@ export default function AiSettingsForm() {
     finally { setBusy(false); }
   }
 
-  return <main className="ai-settings-page">
-    <header><a href="/admin">← Quay lại trang quản trị</a><p>CÀI ĐẶT TÍCH HỢP</p><h1>Model AI & khóa API</h1><span>Chỉ quản trị viên có thể thay đổi cấu hình này. Khóa được mã hóa ở cơ sở dữ liệu và chỉ dùng trên máy chủ.</span></header>
+  return <div className="ai-settings-page">
+    <p className="admin-settings-tab-intro">Chỉ quản trị viên có thể thay đổi cấu hình này. Khóa được mã hóa ở cơ sở dữ liệu và chỉ dùng trên máy chủ.</p>
     <section className="ai-settings-card">
       <div className="ai-settings-status"><b>Trạng thái</b><span className={status?.hasKey ? 'ready' : 'missing'}>{status ? status.keyError ? 'Không giải mã được khóa đã lưu' : status.hasKey ? `Đã có khóa (${status.keySource === 'admin' ? 'lưu trong admin' : 'cấu hình máy chủ'})` : 'Chưa có khóa' : 'Đang tải…'}</span></div>
       {status && !status.canEncrypt && <p className="ai-settings-warning">Máy chủ chưa có khóa mã hóa ổn định. Cấu hình AUTH_SECRET hoặc INTEGRATION_ENCRYPTION_KEY dài ít nhất 32 ký tự trước khi lưu khóa API.</p>}
@@ -111,5 +112,5 @@ export default function AiSettingsForm() {
       {message && <p role="status" className="ai-settings-message">{message}</p>}
     </section>
     <section className="ai-settings-card"><h2>Quy trình đọc hồ sơ</h2><p>Sau khi lưu và kiểm tra kết nối, vào <a href="/admin?view=suppliers">Nhà cung cấp</a> → mở hồ sơ → chọn PDF/JPG/PNG → xác nhận quyền gửi tệp → bấm “AI đọc & đối chiếu hồ sơ”. Kết quả chỉ điền bản nháp; anh kiểm tra chứng từ gốc trước khi lưu và duyệt công khai.</p></section>
-  </main>;
+  </div>;
 }

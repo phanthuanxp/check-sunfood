@@ -57,6 +57,39 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PUT(request: Request) {
+  if (!(await isAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const rejected = rejectUntrustedMutation(request); if (rejected) return rejected;
+  const body = await request.json().catch(() => ({}));
+  const type = value(body.type);
+  const id = Number(body.id);
+  if (!Number.isSafeInteger(id) || id < 1) return NextResponse.json({ error: 'ID không hợp lệ.' }, { status: 400 });
+  try {
+    if (type === 'product') {
+      const product = await prisma.product.findUnique({ where: { id } });
+      if (!product || !value(body.name)) return NextResponse.json({ error: 'Không tìm thấy sản phẩm hoặc thiếu tên.' }, { status: 400 });
+      const gtin = optional(body.gtin, 14);
+      if (gtin && !/^\d{8,14}$/.test(gtin)) return NextResponse.json({ error: 'GTIN phải gồm 8–14 chữ số.' }, { status: 400 });
+      const data = { name: value(body.name), sku: optional(body.sku), gtin, origin: optional(body.origin), unit: optional(body.unit), storage: optional(body.storage), hygieneCertNumber: optional(body.hygieneCertNumber, 100) };
+      const updated = await prisma.product.update({ where: { id }, data });
+      await prisma.auditLog.create({ data: { supplierId: product.supplierId, action: 'UPDATE', entity: 'PRODUCT', entityId: String(id), summary: `Sửa sản phẩm ${updated.name}` } });
+      return NextResponse.json(updated);
+    }
+    if (type === 'batch') {
+      const batch = await prisma.batch.findUnique({ where: { id }, include: { product: true } });
+      const code = value(body.code, 100);
+      const receivedAt = date(body.receivedAt); const producedAt = date(body.producedAt); const expiresAt = date(body.expiresAt);
+      if (!batch || !code || !validDate(receivedAt) || !validDate(producedAt) || !validDate(expiresAt) || (producedAt && expiresAt && expiresAt < producedAt)) return NextResponse.json({ error: 'Mã lô hoặc ngày tháng không hợp lệ.' }, { status: 400 });
+      const updated = await prisma.batch.update({ where: { id }, data: { code, receivedAt, producedAt, expiresAt } });
+      await prisma.auditLog.create({ data: { supplierId: batch.product.supplierId, action: 'UPDATE', entity: 'BATCH', entityId: String(id), summary: `Sửa lô ${code}` } });
+      return NextResponse.json(updated);
+    }
+    return NextResponse.json({ error: 'Loại dữ liệu không hợp lệ.' }, { status: 400 });
+  } catch {
+    return NextResponse.json({ error: 'Trùng mã lô hoặc không lưu được thay đổi.' }, { status: 409 });
+  }
+}
+
 export async function PATCH(request: Request) {
   if (!(await isAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const rejected = rejectUntrustedMutation(request); if (rejected) return rejected;
