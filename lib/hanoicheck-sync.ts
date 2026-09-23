@@ -37,6 +37,7 @@ async function upsertSupplierBatch(nccCode: string, batchCode: string, foodCode:
 
   const existing = await prisma.batch.findUnique({ where: { sourceKey: batchCode } });
   const batchData = {
+    name: detail.batchName,
     receivedAt: parseVietnameseDate(detail.importedAt),
     producedAt: parseVietnameseDate(detail.producedAt),
     expiresAt: parseVietnameseDate(detail.expiresAt),

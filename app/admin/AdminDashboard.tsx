@@ -127,6 +127,17 @@ export default function AdminDashboard({
 }) {
   const router = useRouter();
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("account");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try { return window.localStorage.getItem("admin-sidebar-collapsed") === "1"; } catch { return false; }
+  });
+  function toggleSidebar() {
+    setSidebarCollapsed((current) => {
+      const next = !current;
+      try { window.localStorage.setItem("admin-sidebar-collapsed", next ? "1" : "0"); } catch { /* ignore */ }
+      return next;
+    });
+  }
   const [suppliers] = useState(initialSuppliers);
   const [query, setQuery] = useState("");
   const [expiryFilter, setExpiryFilter] = useState("all");
@@ -428,23 +439,24 @@ export default function AdminDashboard({
   }
 
   return (
-    <main className="admin-shell">
-      <aside className="admin-sidebar">
+    <main className={`admin-shell${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
+      <aside className={`admin-sidebar${sidebarCollapsed ? " collapsed" : ""}`}>
         <a href="/" className="admin-logo">
           <span>SF</span>
           <div><b>Sunfood Tây Đô</b><small>Traceability Console</small></div>
         </a>
+        <button className="sidebar-collapse-toggle" onClick={toggleSidebar} title={sidebarCollapsed ? "Mở rộng menu" : "Thu gọn menu"}>{sidebarCollapsed ? "»" : "«"}</button>
         <p className="sidebar-label">QUẢN LÝ</p>
         <nav>
-          <button className={activeView === "overview" ? "active" : ""} onClick={() => setActiveView("overview")}>
+          <button className={activeView === "overview" ? "active" : ""} onClick={() => setActiveView("overview")} title="Tổng quan">
             <span>⌂</span><b>Tổng quan</b>
           </button>
-          <button className={activeView === "suppliers" ? "active" : ""} onClick={() => setActiveView("suppliers")}><span>◇</span><b>Nhà cung cấp</b></button>
-          <button className={activeView === "batches" ? "active" : ""} onClick={() => setActiveView("batches")}><span>◎</span><b>QL lô nhập hàng</b></button>
-          <button className={activeView === "qr" ? "active" : ""} onClick={() => setActiveView("qr")}><span>▦</span><b>Thư viện QR</b></button>
-          <button className={activeView === "warnings" ? "active" : ""} onClick={() => setActiveView("warnings")}><span>⚠</span><b>Cảnh báo dữ liệu</b>{warningStats.critical > 0 && <em className="nav-badge">{warningStats.critical}</em>}</button>
-          <button className={activeView === "audit" ? "active" : ""} onClick={() => setActiveView("audit")}><span>◷</span><b>Nhật ký</b></button>
-          <button className={activeView === "settings" ? "active" : ""} onClick={() => setActiveView("settings")}><span>⚙</span><b>Cài đặt</b></button>
+          <button className={activeView === "suppliers" ? "active" : ""} onClick={() => setActiveView("suppliers")} title="Nhà cung cấp"><span>◇</span><b>Nhà cung cấp</b></button>
+          <button className={activeView === "batches" ? "active" : ""} onClick={() => setActiveView("batches")} title="QL lô nhập hàng"><span>◎</span><b>QL lô nhập hàng</b></button>
+          <button className={activeView === "qr" ? "active" : ""} onClick={() => setActiveView("qr")} title="Thư viện QR"><span>▦</span><b>Thư viện QR</b></button>
+          <button className={activeView === "warnings" ? "active" : ""} onClick={() => setActiveView("warnings")} title="Cảnh báo dữ liệu"><span>⚠</span><b>Cảnh báo dữ liệu</b>{warningStats.critical > 0 && <em className="nav-badge">{warningStats.critical}</em>}</button>
+          <button className={activeView === "audit" ? "active" : ""} onClick={() => setActiveView("audit")} title="Nhật ký"><span>◷</span><b>Nhật ký</b></button>
+          <button className={activeView === "settings" ? "active" : ""} onClick={() => setActiveView("settings")} title="Cài đặt"><span>⚙</span><b>Cài đặt</b></button>
         </nav>
         <div className="sidebar-account"><div className="admin-avatar">A</div><div><b>Quản trị viên</b><small>Administrator</small></div><button onClick={logout} title="Đăng xuất">↪</button></div>
       </aside>
