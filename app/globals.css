@@ -353,14 +353,6 @@ button {
   padding: 0 24px;
   background: white;
 }
-.admin-link {
-  padding: 9px 14px;
-  border: 1px solid #cfe1d6;
-  border-radius: 9px;
-  text-decoration: none;
-  color: #075f37;
-  font-weight: 700;
-}
 .traceability-hero {
   position: relative;
   overflow: hidden;
@@ -1876,13 +1868,6 @@ button {
   .trace-logo b {
     font-size: 13px;
   }
-  .admin-link {
-    min-height: 38px;
-    padding: 9px 12px;
-    display: inline-flex;
-    align-items: center;
-    font-size: 12px;
-  }
 
   .traceability-hero {
     overflow: hidden;
@@ -2046,9 +2031,20 @@ button {
     gap: 5px;
   }
   .trace-header .trace-logo {
-    flex: 0 0 38px;
+    min-width: 0;
+    flex-shrink: 1;
   }
   .trace-header .trace-logo > div {
+    min-width: 0;
+  }
+  .trace-header .trace-logo b {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .trace-header .trace-logo small {
     display: none;
   }
   .language-switch {
