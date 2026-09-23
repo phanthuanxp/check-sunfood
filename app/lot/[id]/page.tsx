@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { prisma } from '@/lib/prisma';
+import { isBatchAvailable } from '@/lib/trace-publish';
 import type { HcTraceDetail } from '@/lib/hanoicheck-trace';
 import LotQrThumbnail from './LotQrThumbnail';
 import './lot.css';
@@ -79,8 +80,7 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
   if (!batch || (!batch.isPublic && !batch.everPublished)) notFound();
 
   const { product } = batch;
-  const available = batch.isPublic && product.isPublic && product.supplier.verificationStatus === 'VERIFIED'
-    && product.supplier.status === 'ACTIVE' && (!batch.producedAt || batch.producedAt <= new Date());
+  const available = isBatchAvailable(batch);
   const sourceDetail = available ? parseHanoiCheckPayload(batch.sourceSystem, batch.sourcePayload) : null;
   const expiry = expiryStatus(batch.expiresAt, new Date());
   const shelfDays = shelfLifeDays(batch.producedAt, batch.expiresAt);

@@ -2,6 +2,18 @@ import { prisma } from '@/lib/prisma';
 
 export type PublishResult = { ok: true } | { ok: false; status: 404 | 409; error: string };
 
+type BatchAvailability = { isPublic: boolean; product: { isPublic: boolean; supplier: { verificationStatus: string; status: string } } };
+
+/**
+ * Single source of truth for "is this batch actually visible on the public site right now" —
+ * used by the /lot and /lot/print pages. Keep this in sync with setBatchPublic's approval gate
+ * below; duplicating this formula per-page previously let them drift out of sync (a batch could
+ * be approved in the admin but still show as unavailable on the public page).
+ */
+export function isBatchAvailable(batch: BatchAvailability) {
+  return batch.isPublic && batch.product.isPublic && batch.product.supplier.verificationStatus === 'VERIFIED' && batch.product.supplier.status === 'ACTIVE';
+}
+
 export async function setProductPublic(id: number, isPublic: boolean): Promise<PublishResult> {
   const product = await prisma.product.findUnique({ where: { id }, include: { supplier: true } });
   if (!product) return { ok: false, status: 404, error: 'Không tìm thấy sản phẩm.' };
@@ -17,8 +29,8 @@ export async function setProductPublic(id: number, isPublic: boolean): Promise<P
 export async function setBatchPublic(id: number, isPublic: boolean): Promise<PublishResult> {
   const batch = await prisma.batch.findUnique({ where: { id }, include: { product: { include: { supplier: true } } } });
   if (!batch) return { ok: false, status: 404, error: 'Không tìm thấy lô.' };
-  if (isPublic && (!batch.product.isPublic || batch.product.supplier.verificationStatus !== 'VERIFIED' || !batch.receivedAt || batch.receivedAt > new Date() || (batch.producedAt && batch.producedAt > new Date())))
-    return { ok: false, status: 409, error: 'Cần duyệt sản phẩm/NCC và xác minh ngày nhập lô hợp lệ trước khi công khai.' };
+  if (isPublic && (!batch.product.isPublic || batch.product.supplier.verificationStatus !== 'VERIFIED' || !batch.receivedAt))
+    return { ok: false, status: 409, error: 'Cần duyệt sản phẩm/NCC và điền ngày nhập lô trước khi công khai.' };
   await prisma.batch.update({ where: { id }, data: { isPublic, everPublished: isPublic ? true : batch.everPublished } });
   await prisma.auditLog.create({ data: { supplierId: batch.product.supplierId, action: 'PUBLISH', entity: 'BATCH', entityId: String(id), summary: `${isPublic ? 'Công khai' : 'Ẩn'} lô ${batch.code}` } });
   return { ok: true };

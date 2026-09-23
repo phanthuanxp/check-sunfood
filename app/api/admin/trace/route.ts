@@ -34,13 +34,28 @@ export async function POST(request: Request) {
       return NextResponse.json(product, { status: 201 });
     }
     if (type === 'batch') {
-      const productId = Number(body.productId);
-      const product = await prisma.product.findUnique({ where: { id: productId } });
       const code = value(body.code, 100);
       const receivedAt = date(body.receivedAt); const producedAt = date(body.producedAt); const expiresAt = date(body.expiresAt);
-      if (!product || !code || !validDate(receivedAt) || !validDate(producedAt) || !validDate(expiresAt) || (producedAt && expiresAt && expiresAt < producedAt)) return NextResponse.json({ error: 'Mã lô hoặc ngày tháng không hợp lệ.' }, { status: 400 });
-      const batch = await prisma.batch.create({ data: { productId, code, name: optional(body.name, 250), receivedAt, producedAt, expiresAt } });
-      await prisma.auditLog.create({ data: { supplierId: product.supplierId, action: 'CREATE', entity: 'BATCH', entityId: String(batch.id), summary: `Tạo lô nháp ${code}` } });
+      if (!code || !validDate(receivedAt) || !validDate(producedAt) || !validDate(expiresAt) || (producedAt && expiresAt && expiresAt < producedAt)) return NextResponse.json({ error: 'Mã lô hoặc ngày tháng không hợp lệ.' }, { status: 400 });
+      const newProduct = body.newProduct as { supplierId?: unknown; name?: unknown; sku?: unknown } | undefined;
+      if (newProduct) {
+        const supplier = await prisma.supplier.findUnique({ where: { id: Number(newProduct.supplierId) } });
+        if (!supplier || !value(newProduct.name)) return NextResponse.json({ error: 'Chọn NCC và nhập tên sản phẩm mới.' }, { status: 400 });
+      } else {
+        const existing = await prisma.product.findUnique({ where: { id: Number(body.productId) } });
+        if (!existing) return NextResponse.json({ error: 'Không tìm thấy sản phẩm.' }, { status: 400 });
+      }
+      // Create the (optional) new product and its first batch in one transaction so a
+      // batch-creation failure (e.g. duplicate code) never leaves an orphan product behind.
+      const { batch, product } = await prisma.$transaction(async tx => {
+        const product = newProduct
+          ? await tx.product.create({ data: { supplierId: Number(newProduct.supplierId), name: value(newProduct.name), sku: optional(newProduct.sku) } })
+          : await tx.product.findUniqueOrThrow({ where: { id: Number(body.productId) } });
+        const batch = await tx.batch.create({ data: { productId: product.id, code, name: optional(body.name, 250), receivedAt, producedAt, expiresAt } });
+        return { batch, product };
+      });
+      const summary = newProduct ? `Tạo lô nháp ${code} kèm sản phẩm mới ${product.name}` : `Tạo lô nháp ${code}`;
+      await prisma.auditLog.create({ data: { supplierId: product.supplierId, action: 'CREATE', entity: 'BATCH', entityId: String(batch.id), summary } });
       return NextResponse.json(batch, { status: 201 });
     }
     if (type === 'event') {
@@ -71,9 +86,17 @@ export async function PUT(request: Request) {
       if (!product || !value(body.name)) return NextResponse.json({ error: 'Không tìm thấy sản phẩm hoặc thiếu tên.' }, { status: 400 });
       const gtin = optional(body.gtin, 14);
       if (gtin && !/^\d{8,14}$/.test(gtin)) return NextResponse.json({ error: 'GTIN phải gồm 8–14 chữ số.' }, { status: 400 });
-      const data = { name: value(body.name), sku: optional(body.sku), gtin, origin: optional(body.origin), unit: optional(body.unit), storage: optional(body.storage), hygieneCertNumber: optional(body.hygieneCertNumber, 100) };
+      const supplierId = Number(body.supplierId ?? product.supplierId);
+      const supplier = supplierId === product.supplierId ? product : await prisma.supplier.findUnique({ where: { id: supplierId } });
+      if (!supplier) return NextResponse.json({ error: 'Không tìm thấy nhà cung cấp.' }, { status: 400 });
+      const data = {
+        supplierId, name: value(body.name), sku: optional(body.sku), gtin, storage: optional(body.storage), hygieneCertNumber: optional(body.hygieneCertNumber, 100),
+        origin: body.origin === undefined ? product.origin : optional(body.origin),
+        unit: body.unit === undefined ? product.unit : optional(body.unit),
+      };
       const updated = await prisma.product.update({ where: { id }, data });
-      await prisma.auditLog.create({ data: { supplierId: product.supplierId, action: 'UPDATE', entity: 'PRODUCT', entityId: String(id), summary: `Sửa sản phẩm ${updated.name}` } });
+      const summary = supplierId !== product.supplierId ? `Sửa sản phẩm ${updated.name} (chuyển sang NCC #${supplierId})` : `Sửa sản phẩm ${updated.name}`;
+      await prisma.auditLog.create({ data: { supplierId, action: 'UPDATE', entity: 'PRODUCT', entityId: String(id), summary } });
       return NextResponse.json(updated);
     }
     if (type === 'batch') {

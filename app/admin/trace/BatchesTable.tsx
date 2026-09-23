@@ -1,5 +1,5 @@
 'use client';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 
 type BatchRow = {
   id: number; publicId: string; code: string; name: string | null;
@@ -11,14 +11,32 @@ type BatchRow = {
   supplier: { id: number; code: string; name: string; verificationStatus: string; status: string };
 };
 type SupplierOption = { id: number; code: string; name: string };
+type SupplierSummary = { id: number; code: string; name: string; address: string | null; verificationStatus: string; status: string };
 type Event = { id: number; title: string; stage: string; occurredAt: string; isPublic: boolean; location: string | null; details: string | null };
 type ProductDetail = { id: number; name: string; sku: string | null; gtin: string | null; origin: string | null; unit: string | null; storage: string | null; hygieneCertNumber: string | null; isPublic: boolean };
-type BatchDetail = Omit<BatchRow, 'product'> & { events: Event[]; product: ProductDetail };
+type BatchDetail = Omit<BatchRow, 'product' | 'supplier'> & { events: Event[]; product: ProductDetail; supplier: SupplierSummary };
 type ProductOption = { id: number; name: string; supplierCode: string; supplierName: string };
 type OrphanProduct = { id: number; name: string; sku: string | null; isPublic: boolean; supplierCode: string; supplierName: string };
 
 const statusLabels: Record<BatchRow['status'], string> = { DRAFT: 'Nháp', PUBLIC: 'Đã duyệt', HIDDEN: 'Tạm ẩn' };
 const sourceLabels: Record<string, string> = { LOCAL: 'Nhập tay', HANOICHECK: 'HanoiCheck' };
+const verificationShortLabels: Record<string, string> = { PENDING: 'Đang đối chiếu', VERIFIED: 'Đã xác minh', NEEDS_REVIEW: 'Cần rà soát' };
+
+function publishChecklist(batch: BatchDetail) {
+  return [
+    { ok: batch.supplier.verificationStatus === 'VERIFIED', label: `Nhà cung cấp ${batch.supplier.code} đã được xác minh` },
+    { ok: batch.supplier.status === 'ACTIVE', label: `Nhà cung cấp ${batch.supplier.code} đang hoạt động` },
+    { ok: batch.product.isPublic, label: 'Sản phẩm đã được duyệt công khai' },
+    { ok: Boolean(batch.receivedAt), label: 'Đã điền ngày nhập hàng' },
+  ];
+}
+
+function generateGtin13() {
+  const digits = Array.from({ length: 12 }, () => Math.floor(Math.random() * 10));
+  const sum = digits.reduce((total, digit, index) => total + digit * (index % 2 === 0 ? 1 : 3), 0);
+  const checkDigit = (10 - (sum % 10)) % 10;
+  return `${digits.join('')}${checkDigit}`;
+}
 
 const fmt = (iso: string | null) => iso ? new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(iso)) : '—';
 const toInputValue = (iso: string | null) => {
@@ -26,16 +44,19 @@ const toInputValue = (iso: string | null) => {
   const d = new Date(iso);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
+const todayInputValue = () => toInputValue(new Date().toISOString());
 
-function publishBlockedReasons(batch: BatchDetail) {
-  const reasons: string[] = [];
-  if (!batch.product.isPublic) reasons.push('sản phẩm chưa được duyệt công khai (xem mục "Thông tin sản phẩm" bên dưới)');
-  if (batch.supplier.verificationStatus !== 'VERIFIED') reasons.push(`nhà cung cấp ${batch.supplier.code} chưa được xác minh (vào mục Nhà cung cấp để xác minh)`);
-  if (batch.supplier.status !== 'ACTIVE') reasons.push(`nhà cung cấp ${batch.supplier.code} đang tạm ngừng hoạt động`);
-  if (!batch.receivedAt) reasons.push('chưa có ngày nhập hàng');
-  else if (new Date(batch.receivedAt) > new Date()) reasons.push('ngày nhập hàng đang ở tương lai');
-  if (batch.producedAt && new Date(batch.producedAt) > new Date()) reasons.push('ngày sản xuất đang ở tương lai');
-  return reasons;
+type BatchListItem = { id: number; code: string; product: { id: number } };
+async function findDuplicateBatchCode(code: string, productId: number, excludeId?: number) {
+  const trimmed = code.trim();
+  if (!trimmed || !productId) return '';
+  try {
+    const response = await fetch(`/api/admin/trace/batches?q=${encodeURIComponent(trimmed)}&pageSize=20`, { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok) return '';
+    const match = (data.items as BatchListItem[]).find(item => item.product.id === productId && item.code.toLowerCase() === trimmed.toLowerCase() && item.id !== excludeId);
+    return match ? 'Mã lô này đã tồn tại cho sản phẩm này — vui lòng đổi mã khác.' : '';
+  } catch { return ''; }
 }
 
 const PAGE_SIZE = 30;
@@ -69,9 +90,15 @@ export default function BatchesTable() {
   const [showCreate, setShowCreate] = useState(false);
   const [createMode, setCreateMode] = useState<'existing' | 'new'>('existing');
   const [productOptions, setProductOptions] = useState<ProductOption[]>([]);
+  const [createProductId, setCreateProductId] = useState('');
+  const [createCode, setCreateCode] = useState('');
+  const [createCodeWarning, setCreateCodeWarning] = useState('');
+  const [editCode, setEditCode] = useState('');
+  const [editCodeWarning, setEditCodeWarning] = useState('');
 
   const [orphanProducts, setOrphanProducts] = useState<OrphanProduct[]>([]);
   const [showOrphans, setShowOrphans] = useState(false);
+  const gtinInputRef = useRef<HTMLInputElement>(null);
 
   async function refreshOrphans() {
     const response = await fetch('/api/admin/trace', { cache: 'no-store' });
@@ -94,6 +121,23 @@ export default function BatchesTable() {
   }
 
   useEffect(() => { const timer = setTimeout(() => { setQ(qInput); setPage(1); }, 300); return () => clearTimeout(timer); }, [qInput]);
+
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (createMode !== 'existing' || !createProductId || !createCode.trim()) { setCreateCodeWarning(''); return; }
+      setCreateCodeWarning(await findDuplicateBatchCode(createCode, Number(createProductId)));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [createCode, createProductId, createMode]);
+
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (!drawerBatch || !editCode.trim() || editCode === drawerBatch.code) { setEditCodeWarning(''); return; }
+      setEditCodeWarning(await findDuplicateBatchCode(editCode, drawerBatch.product.id, drawerBatch.id));
+    }, 400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editCode]);
 
   function updateFilter<T extends string>(setter: (value: T) => void) {
     return (value: T) => { setter(value); setPage(1); };
@@ -174,11 +218,11 @@ export default function BatchesTable() {
     try {
       const response = await fetch(`/api/admin/trace/batches/${id}`, { cache: 'no-store' });
       const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Không đọc được lô.');
-      setDrawerBatch(data);
+      setDrawerBatch(data); setEditCode(data.code); setEditCodeWarning('');
     } catch (error) { notify(error instanceof Error ? error.message : 'Không đọc được lô.', 'error'); setDrawerId(null); }
     finally { setDrawerLoading(false); }
   }
-  function closeDrawer() { setDrawerId(null); setDrawerBatch(null); setSelectedEvents(new Set()); }
+  function closeDrawer() { setDrawerId(null); setDrawerBatch(null); setSelectedEvents(new Set()); setEditCode(''); setEditCodeWarning(''); }
 
   async function saveBatch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (!drawerBatch) return;
@@ -245,29 +289,30 @@ export default function BatchesTable() {
   }
 
   async function openCreate() {
-    setShowCreate(true); setCreateMode('existing');
+    setShowCreate(true); setCreateMode('existing'); setCreateProductId(''); setCreateCode(''); setCreateCodeWarning('');
     if (productOptions.length) return;
     const response = await fetch('/api/admin/trace', { cache: 'no-store' });
     const data = await response.json();
     if (response.ok) setProductOptions(data.flatMap((supplier: { code: string; name: string; products: { id: number; name: string }[] }) =>
       supplier.products.map(product => ({ id: product.id, name: product.name, supplierCode: supplier.code, supplierName: supplier.name }))));
   }
+  function closeCreate() { setShowCreate(false); setCreateProductId(''); setCreateCode(''); setCreateCodeWarning(''); }
 
   async function createBatch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); notify('Đang lưu lô…');
     const form = event.currentTarget;
     const data = Object.fromEntries(new FormData(form)) as Record<string, string>;
     try {
-      let productId = data.productId;
+      const payload: Record<string, unknown> = { type: 'batch', code: data.code, name: data.name, receivedAt: data.receivedAt, producedAt: data.producedAt, expiresAt: data.expiresAt };
       if (createMode === 'new') {
         if (!data.newSupplierId || !data.newProductName) throw new Error('Chọn NCC và nhập tên sản phẩm mới.');
-        const productResponse = await fetch('/api/admin/trace', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'product', supplierId: data.newSupplierId, name: data.newProductName, sku: data.newSku }) });
-        const product = await productResponse.json(); if (!productResponse.ok) throw new Error(product.error || 'Không tạo được sản phẩm mới.');
-        productId = String(product.id);
+        payload.newProduct = { supplierId: data.newSupplierId, name: data.newProductName, sku: data.newSku };
+      } else {
+        payload.productId = data.productId;
       }
-      const response = await fetch('/api/admin/trace', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'batch', productId, code: data.code, name: data.name, receivedAt: data.receivedAt, producedAt: data.producedAt, expiresAt: data.expiresAt }) });
+      const response = await fetch('/api/admin/trace', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Không lưu được.');
-      form.reset(); setShowCreate(false); setProductOptions([]); await refresh(); notify('Đã tạo lô nháp.');
+      form.reset(); closeCreate(); await refresh(); notify('Đã tạo lô nháp.');
     } catch (error) { notify(error instanceof Error ? error.message : 'Không lưu được.', 'error'); }
     finally { setBusy(false); }
   }
@@ -312,25 +357,34 @@ export default function BatchesTable() {
       </div>
     </div>
 
-    {showCreate && <form className="trace-edit-form trace-create-batch panel" onSubmit={createBatch}>
-      <div className="trace-create-mode wide">
-        <button type="button" className={createMode === 'existing' ? 'active' : ''} onClick={() => setCreateMode('existing')}>Sản phẩm có sẵn</button>
-        <button type="button" className={createMode === 'new' ? 'active' : ''} onClick={() => setCreateMode('new')}>+ Sản phẩm mới</button>
+    {showCreate && <div className="modal-backdrop" onClick={closeCreate}>
+      <div className="modal" onClick={event => event.stopPropagation()}>
+        <div className="modal-head">
+          <div><h2>Tạo lô nhập hàng mới</h2><p>Gắn lô với sản phẩm có sẵn, hoặc tạo sản phẩm mới ngay tại đây.</p></div>
+          <button onClick={closeCreate}>×</button>
+        </div>
+        <form className="trace-edit-form trace-create-batch" onSubmit={createBatch}>
+          <div className="trace-create-mode wide">
+            <button type="button" className={createMode === 'existing' ? 'active' : ''} onClick={() => setCreateMode('existing')}>Sản phẩm có sẵn</button>
+            <button type="button" className={createMode === 'new' ? 'active' : ''} onClick={() => setCreateMode('new')}>+ Sản phẩm mới</button>
+          </div>
+          {createMode === 'existing'
+            ? <label className="wide">Sản phẩm <select name="productId" required value={createProductId} onChange={event => setCreateProductId(event.target.value)}><option value="">Chọn sản phẩm</option>{productOptions.map(product => <option key={product.id} value={product.id}>{product.supplierCode} · {product.name}</option>)}</select></label>
+            : <>
+              <label>Nhà cung cấp <select name="newSupplierId" required><option value="">Chọn nhà cung cấp</option>{suppliers.map(supplier => <option key={supplier.id} value={supplier.id}>{supplier.code} · {supplier.name}</option>)}</select></label>
+              <label>Tên sản phẩm mới <input name="newProductName" placeholder="VD: Thịt lợn vai" required /></label>
+              <label className="wide">SKU (nếu có) <input name="newSku" placeholder="VD: THITLONVAI-NCC01" /></label>
+            </>}
+          <label>Tên lô <input name="name" placeholder="VD: Thịt lợn vai ngày 23/9" /></label>
+          <label>Mã lô (trên chứng từ) <input name="code" placeholder="VD: LO-THITLONVAI-NCC01-0923" required value={createCode} onChange={event => setCreateCode(event.target.value)} /></label>
+          {createCodeWarning && <p className="wide trace-field-warning">⚠ {createCodeWarning}</p>}
+          <label>Ngày nhập hàng <input name="receivedAt" type="date" defaultValue={todayInputValue()} /></label>
+          <label>Ngày sản xuất <input name="producedAt" type="date" /></label>
+          <label>Hạn dùng <input name="expiresAt" type="date" /></label>
+          <div className="trace-row-actions wide"><button className="primary-btn" disabled={busy || (createMode === 'existing' && Boolean(createCodeWarning))}>Tạo lô nháp</button><button className="secondary-btn" type="button" onClick={closeCreate}>Hủy</button></div>
+        </form>
       </div>
-      {createMode === 'existing'
-        ? <select name="productId" required><option value="">Chọn sản phẩm</option>{productOptions.map(product => <option key={product.id} value={product.id}>{product.supplierCode} · {product.name}</option>)}</select>
-        : <>
-          <select name="newSupplierId" required><option value="">Chọn nhà cung cấp</option>{suppliers.map(supplier => <option key={supplier.id} value={supplier.id}>{supplier.code} · {supplier.name}</option>)}</select>
-          <input name="newProductName" placeholder="Tên sản phẩm mới" required />
-          <input name="newSku" placeholder="SKU (nếu có)" />
-        </>}
-      <input name="name" placeholder="Tên lô (VD: Thịt lợn vai ngày 23/9)" />
-      <input name="code" placeholder="Mã lô trên chứng từ" required />
-      <label>Ngày nhập hàng <input name="receivedAt" type="date" /></label>
-      <label>Ngày sản xuất <input name="producedAt" type="date" /></label>
-      <label>Hạn dùng <input name="expiresAt" type="date" /></label>
-      <div className="trace-row-actions wide"><button className="primary-btn" disabled={busy}>Tạo lô nháp</button><button className="secondary-btn" type="button" onClick={() => setShowCreate(false)}>Hủy</button></div>
-    </form>}
+    </div>}
 
     {selected.size > 0 && <div className="trace-bulk-bar">
       <span>{selected.size} lô đã chọn</span>
@@ -412,18 +466,43 @@ export default function BatchesTable() {
         </div>
         {drawerLoading && <p className="empty">Đang tải…</p>}
         {drawerBatch && !drawerLoading && <>
-          {!drawerBatch.isPublic && publishBlockedReasons(drawerBatch).length > 0 && <p className="trace-publish-hint">Chưa thể duyệt công khai lô này vì {publishBlockedReasons(drawerBatch).join('; ')}.</p>}
-          <form className="trace-edit-form" onSubmit={saveBatch}>
-            <input name="name" defaultValue={drawerBatch.name || ''} placeholder="Tên lô" />
-            <input name="code" defaultValue={drawerBatch.code} placeholder="Mã lô" required />
-            <label>Ngày nhập hàng <input name="receivedAt" type="date" defaultValue={toInputValue(drawerBatch.receivedAt)} /></label>
-            <label>Ngày sản xuất <input name="producedAt" type="date" defaultValue={toInputValue(drawerBatch.producedAt)} /></label>
-            <label>Hạn dùng <input name="expiresAt" type="date" defaultValue={toInputValue(drawerBatch.expiresAt)} /></label>
-            <div className="trace-row-actions">
-              <button className="primary-btn" disabled={busy}>Lưu lô</button>
-              <button className="secondary-btn" type="button" disabled={busy} onClick={() => toggleOne(drawerBatch.id, !drawerBatch.isPublic)}>{drawerBatch.isPublic ? '⊘ Ẩn lô' : '✓ Duyệt lô'}</button>
+          <div className="trace-supplier-brief">
+            <div>
+              <p className="trace-supplier-brief-label">Nhà cung cấp</p>
+              <b>{drawerBatch.supplier.code} · {drawerBatch.supplier.name}</b>
+              <small>{drawerBatch.supplier.address || 'Chưa có địa chỉ'}</small>
+              <div className="trace-supplier-brief-badges">
+                <span className={`trace-tag ${drawerBatch.supplier.verificationStatus === 'VERIFIED' ? 'trace-tag-ok' : 'trace-tag-warn'}`}>{verificationShortLabels[drawerBatch.supplier.verificationStatus] || drawerBatch.supplier.verificationStatus}</span>
+                <span className={`trace-tag ${drawerBatch.supplier.status === 'ACTIVE' ? 'trace-tag-ok' : 'trace-tag-warn'}`}>{drawerBatch.supplier.status === 'ACTIVE' ? 'Đang hoạt động' : 'Tạm ngừng'}</span>
+              </div>
             </div>
-          </form>
+            <small className="trace-supplier-brief-hint">Sai NCC? Đổi ở mục &quot;Thông tin sản phẩm&quot; bên dưới.</small>
+          </div>
+
+          {drawerBatch.isPublic
+            ? <p className="trace-publish-live">✓ Lô đang công khai trên trang truy xuất.</p>
+            : <div className="trace-publish-checklist">
+                <p className="trace-publish-checklist-title">Điều kiện để duyệt công khai lô này</p>
+                <ul>
+                  {publishChecklist(drawerBatch).map(item => <li key={item.label} className={item.ok ? 'ok' : 'pending'}><span aria-hidden>{item.ok ? '✓' : '○'}</span>{item.label}</li>)}
+                </ul>
+              </div>}
+
+          <div className="document-form">
+            <h3>Thông tin lô</h3>
+            <form className="trace-edit-form" onSubmit={saveBatch}>
+              <label>Tên lô <input name="name" defaultValue={drawerBatch.name || ''} placeholder="VD: Thịt lợn vai ngày 23/9" /></label>
+              <label>Mã lô <input name="code" defaultValue={drawerBatch.code} placeholder="VD: LO-THITLONVAI-NCC01-0923" required value={editCode} onChange={event => setEditCode(event.target.value)} /></label>
+              {editCodeWarning && <p className="wide trace-field-warning">⚠ {editCodeWarning}</p>}
+              <label>Ngày nhập hàng <input name="receivedAt" type="date" defaultValue={toInputValue(drawerBatch.receivedAt)} /></label>
+              <label>Ngày sản xuất <input name="producedAt" type="date" defaultValue={toInputValue(drawerBatch.producedAt)} /></label>
+              <label>Hạn dùng <input name="expiresAt" type="date" defaultValue={toInputValue(drawerBatch.expiresAt)} /></label>
+              <div className="trace-row-actions">
+                <button className="primary-btn" disabled={busy || Boolean(editCodeWarning)}>Lưu lô</button>
+                <button className="secondary-btn" type="button" disabled={busy} onClick={() => toggleOne(drawerBatch.id, !drawerBatch.isPublic)}>{drawerBatch.isPublic ? '⊘ Ẩn lô' : '✓ Duyệt lô'}</button>
+              </div>
+            </form>
+          </div>
           {drawerBatch.sourceTraceUrl && <p><a href={drawerBatch.sourceTraceUrl} target="_blank" rel="noreferrer">Xem trên HanoiCheck ↗</a></p>}
           {(drawerBatch.isPublic || drawerBatch.everPublished) && <div className="trace-qr-links">
             <a href={`/lot/${drawerBatch.publicId}`} target="_blank">Trang truy xuất</a>
@@ -435,12 +514,16 @@ export default function BatchesTable() {
           <div className="document-form">
             <h3>Thông tin sản phẩm</h3>
             <form className="trace-edit-form" onSubmit={saveProduct}>
-              <input name="name" defaultValue={drawerBatch.product.name} placeholder="Tên sản phẩm" required />
-              <input name="sku" defaultValue={drawerBatch.product.sku || ''} placeholder="SKU" />
-              <input name="gtin" defaultValue={drawerBatch.product.gtin || ''} placeholder="GTIN 8–14 số" />
-              <input name="origin" defaultValue={drawerBatch.product.origin || ''} placeholder="Xuất xứ" />
-              <input name="unit" defaultValue={drawerBatch.product.unit || ''} placeholder="Quy cách/đơn vị" />
-              <input name="storage" defaultValue={drawerBatch.product.storage || ''} placeholder="Bảo quản" />
+              <label>Nhà cung cấp <select name="supplierId" defaultValue={drawerBatch.supplier.id}>{suppliers.map(supplier => <option key={supplier.id} value={supplier.id}>{supplier.code} · {supplier.name}</option>)}</select></label>
+              <label>Tên sản phẩm <input name="name" defaultValue={drawerBatch.product.name} placeholder="VD: Thịt lợn vai" required /></label>
+              <label>SKU (mã nội bộ) <input name="sku" defaultValue={drawerBatch.product.sku || ''} placeholder="VD: THITLONVAI-NCC01" /></label>
+              <label>GTIN (mã vạch, 8–14 số)
+                <div className="trace-gtin-row">
+                  <input name="gtin" ref={gtinInputRef} defaultValue={drawerBatch.product.gtin || ''} placeholder="Chưa có" />
+                  <button type="button" className="secondary-btn" onClick={() => { if (gtinInputRef.current) gtinInputRef.current.value = generateGtin13(); }}>Tạo mã</button>
+                </div>
+              </label>
+              <label>Bảo quản <input name="storage" defaultValue={drawerBatch.product.storage || ''} placeholder="VD: Bảo quản lạnh 2–6°C" /></label>
               <label>Mã K.T.V.S.T.Y <small>Chỉ điền cho sản phẩm thịt lợn có mã kiểm dịch thú y thật; để trống với sản phẩm khác.</small><input name="hygieneCertNumber" defaultValue={drawerBatch.product.hygieneCertNumber || ''} placeholder="VD: 12.033.02" /></label>
               <div className="trace-row-actions">
                 <button className="primary-btn" disabled={busy}>Lưu sản phẩm</button>
