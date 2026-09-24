@@ -93,6 +93,7 @@ export async function PUT(request: Request) {
         supplierId, name: value(body.name), sku: optional(body.sku), gtin, storage: optional(body.storage), hygieneCertNumber: optional(body.hygieneCertNumber, 100),
         origin: body.origin === undefined ? product.origin : optional(body.origin),
         unit: body.unit === undefined ? product.unit : optional(body.unit),
+        imageUrl: body.imageUrl === undefined ? product.imageUrl : optional(body.imageUrl, 500),
       };
       const updated = await prisma.product.update({ where: { id }, data });
       const summary = supplierId !== product.supplierId ? `Sửa sản phẩm ${updated.name} (chuyển sang NCC #${supplierId})` : `Sửa sản phẩm ${updated.name}`;

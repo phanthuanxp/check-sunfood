@@ -27,7 +27,7 @@ export function isPublicIdFormat(identifier: string) {
 export function findBatchByLotIdentifier(identifier: string) {
   return prisma.batch.findUnique({
     where: isPublicIdFormat(identifier) ? { publicId: identifier } : { code: identifier },
-    include: { product: { include: { supplier: true } } },
+    include: { product: { include: { supplier: true } }, events: { where: { isPublic: true }, orderBy: { occurredAt: 'asc' } } },
   });
 }
 

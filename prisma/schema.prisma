@@ -175,6 +175,8 @@ model TraceEvent {
   title      String
   details    String?
   location   String?
+  performedBy     String?
+  performedByRole String?
   isPublic   Boolean  @default(false)
   batch      Batch    @relation(fields: [batchId], references: [id], onDelete: Restrict)
 

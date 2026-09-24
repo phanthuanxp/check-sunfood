@@ -1,5 +1,8 @@
 'use client';
 import { FormEvent, useEffect, useRef, useState } from 'react';
+import { PRODUCTION_STEPS } from '@/lib/production-steps';
+
+/* eslint-disable @next/next/no-img-element -- admin preview of an uploaded product photo, not a static Next-optimizable asset. */
 
 type BatchRow = {
   id: number; publicId: string; code: string; name: string | null;
@@ -12,8 +15,8 @@ type BatchRow = {
 };
 type SupplierOption = { id: number; code: string; name: string };
 type SupplierSummary = { id: number; code: string; name: string; address: string | null; verificationStatus: string; status: string };
-type Event = { id: number; title: string; stage: string; occurredAt: string; isPublic: boolean; location: string | null; details: string | null };
-type ProductDetail = { id: number; name: string; sku: string | null; gtin: string | null; origin: string | null; unit: string | null; storage: string | null; hygieneCertNumber: string | null; isPublic: boolean };
+type Event = { id: number; title: string; stage: string; occurredAt: string; isPublic: boolean; location: string | null; details: string | null; performedBy: string | null; performedByRole: string | null };
+type ProductDetail = { id: number; name: string; sku: string | null; gtin: string | null; origin: string | null; unit: string | null; storage: string | null; hygieneCertNumber: string | null; imageUrl: string | null; isPublic: boolean };
 type BatchDetail = Omit<BatchRow, 'product' | 'supplier'> & { events: Event[]; product: ProductDetail; supplier: SupplierSummary };
 type ProductOption = { id: number; name: string; supplierCode: string; supplierName: string };
 type OrphanProduct = { id: number; name: string; sku: string | null; isPublic: boolean; supplierCode: string; supplierName: string };
@@ -87,7 +90,6 @@ export default function BatchesTable() {
   const [drawerId, setDrawerId] = useState<number | null>(null);
   const [drawerBatch, setDrawerBatch] = useState<BatchDetail | null>(null);
   const [drawerLoading, setDrawerLoading] = useState(false);
-  const [selectedEvents, setSelectedEvents] = useState<Set<number>>(new Set());
 
   const [showCreate, setShowCreate] = useState(false);
   const [createMode, setCreateMode] = useState<'existing' | 'new'>('existing');
@@ -101,6 +103,9 @@ export default function BatchesTable() {
   const [orphanProducts, setOrphanProducts] = useState<OrphanProduct[]>([]);
   const [showOrphans, setShowOrphans] = useState(false);
   const gtinInputRef = useRef<HTMLInputElement>(null);
+  const productImageInputRef = useRef<HTMLInputElement>(null);
+  const [productImagePreview, setProductImagePreview] = useState<string | null>(null);
+  const [removeProductImage, setRemoveProductImage] = useState(false);
 
   async function refreshOrphans() {
     const response = await fetch('/api/admin/trace', { cache: 'no-store' });
@@ -216,7 +221,7 @@ export default function BatchesTable() {
   }
 
   async function openDrawer(id: number) {
-    setDrawerId(id); setDrawerLoading(true); setSelectedEvents(new Set());
+    setDrawerId(id); setDrawerLoading(true); setProductImagePreview(null); setRemoveProductImage(false);
     try {
       const response = await fetch(`/api/admin/trace/batches/${id}`, { cache: 'no-store' });
       const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Không đọc được lô.');
@@ -224,7 +229,7 @@ export default function BatchesTable() {
     } catch (error) { notify(error instanceof Error ? error.message : 'Không đọc được lô.', 'error'); setDrawerId(null); }
     finally { setDrawerLoading(false); }
   }
-  function closeDrawer() { setDrawerId(null); setDrawerBatch(null); setSelectedEvents(new Set()); setEditCode(''); setEditCodeWarning(''); }
+  function closeDrawer() { setDrawerId(null); setDrawerBatch(null); setEditCode(''); setEditCodeWarning(''); }
 
   async function saveBatch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (!drawerBatch) return;
@@ -241,10 +246,26 @@ export default function BatchesTable() {
   async function saveProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (!drawerBatch) return;
     setBusy(true); notify('Đang lưu sản phẩm…');
-    const data = Object.fromEntries(new FormData(event.currentTarget));
+    const formData = new FormData(event.currentTarget);
+    const imageFile = formData.get('productImage');
+    formData.delete('productImage');
+    const data = Object.fromEntries(formData) as Record<string, unknown>;
     try {
+      if (imageFile instanceof File && imageFile.size > 0) {
+        notify('Đang tải ảnh lên…');
+        const upload = new FormData();
+        upload.set('file', imageFile);
+        const uploaded = await fetch('/api/upload', { method: 'POST', body: upload });
+        const uploadResult = await uploaded.json();
+        if (!uploaded.ok) throw new Error(uploadResult.error || 'Tải ảnh thất bại.');
+        data.imageUrl = uploadResult.fileUrl;
+        notify('Đang lưu sản phẩm…');
+      } else if (removeProductImage) {
+        data.imageUrl = '';
+      }
       const response = await fetch('/api/admin/trace', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'product', id: drawerBatch.product.id, ...data }) });
       const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Không lưu được.');
+      setProductImagePreview(null); setRemoveProductImage(false);
       await refresh(); await openDrawer(drawerBatch.id); notify('Đã lưu sản phẩm.');
     } catch (error) { notify(error instanceof Error ? error.message : 'Không lưu được.', 'error'); }
     finally { setBusy(false); }
@@ -261,32 +282,14 @@ export default function BatchesTable() {
     finally { setBusy(false); }
   }
 
-  function toggleEventSelect(id: number) {
-    setSelectedEvents(current => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
-  }
-
-  async function bulkEventPublish(isPublic: boolean) {
-    if (!drawerBatch || !selectedEvents.size) return;
-    setBusy(true); notify('Đang duyệt sự kiện…');
+  async function toggleProductionStep(stepKey: string, checked: boolean) {
+    if (!drawerBatch) return;
+    setBusy(true); notify(checked ? 'Đang thêm bước quy trình…' : 'Đang ẩn bước quy trình…');
     try {
-      const response = await fetch('/api/admin/trace/bulk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'event', ids: Array.from(selectedEvents), isPublic }) });
-      const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Không xử lý được.');
-      await openDrawer(drawerBatch.id); await refresh();
-      notify(`Đã ${isPublic ? 'duyệt' : 'ẩn'} ${result.succeeded.length}/${result.succeeded.length + result.failed.length} sự kiện.${result.failed.length ? ' Bỏ qua: ' + result.failed.slice(0, 3).map((f: { id: number; error: string }) => f.error).join(' | ') : ''}`, result.succeeded.length === 0 && result.failed.length > 0 ? 'error' : 'info');
-    } catch (error) { notify(error instanceof Error ? error.message : 'Không xử lý được.', 'error'); }
-    finally { setBusy(false); }
-  }
-
-  async function createEvent(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); if (!drawerBatch) return;
-    setBusy(true); notify('Đang lưu sự kiện…');
-    const form = event.currentTarget;
-    const data = Object.fromEntries(new FormData(form));
-    try {
-      const response = await fetch('/api/admin/trace', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'event', batchId: drawerBatch.id, ...data }) });
-      const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Không lưu được.');
-      form.reset(); await openDrawer(drawerBatch.id); notify('Đã lưu sự kiện.');
-    } catch (error) { notify(error instanceof Error ? error.message : 'Không lưu được.', 'error'); }
+      const response = await fetch('/api/admin/trace/production-steps', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ batchId: drawerBatch.id, stepKey, checked }) });
+      const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Không cập nhật được.');
+      await openDrawer(drawerBatch.id); notify('Đã cập nhật.');
+    } catch (error) { notify(error instanceof Error ? error.message : 'Không cập nhật được.', 'error'); }
     finally { setBusy(false); }
   }
 
@@ -516,6 +519,22 @@ export default function BatchesTable() {
           <div className="document-form">
             <h3>Thông tin sản phẩm</h3>
             <form className="trace-edit-form" onSubmit={saveProduct}>
+              <label className="wide">Ảnh sản phẩm <small>Hiển thị làm ảnh nền trong trang truy xuất công khai của lô. Chấp nhận JPG/PNG, tối đa 10MB.</small>
+                <div className="trace-image-row">
+                  {!removeProductImage && (productImagePreview || drawerBatch.product.imageUrl) && <img className="trace-product-thumb" src={productImagePreview || drawerBatch.product.imageUrl || ''} alt="" />}
+                  <div className="trace-image-actions">
+                    <input type="file" name="productImage" accept="image/jpeg,image/png" ref={productImageInputRef} onChange={event => {
+                      const file = event.target.files?.[0];
+                      if (!file) return;
+                      setRemoveProductImage(false);
+                      const reader = new FileReader();
+                      reader.onload = () => setProductImagePreview(typeof reader.result === 'string' ? reader.result : null);
+                      reader.readAsDataURL(file);
+                    }} />
+                    {!removeProductImage && (drawerBatch.product.imageUrl || productImagePreview) && <button type="button" className="secondary-btn" onClick={() => { setRemoveProductImage(true); setProductImagePreview(null); if (productImageInputRef.current) productImageInputRef.current.value = ''; }}>✕ Xóa ảnh</button>}
+                  </div>
+                </div>
+              </label>
               <label>Nhà cung cấp <select name="supplierId" defaultValue={drawerBatch.supplier.id}>{suppliers.map(supplier => <option key={supplier.id} value={supplier.id}>{supplier.code} · {supplier.name}</option>)}</select></label>
               <label>Tên sản phẩm <input name="name" defaultValue={drawerBatch.product.name} placeholder="VD: Thịt lợn vai" required /></label>
               <label>SKU (mã nội bộ) <input name="sku" defaultValue={drawerBatch.product.sku || ''} placeholder="VD: THITLONVAI-NCC01" /></label>
@@ -535,24 +554,23 @@ export default function BatchesTable() {
           </div>
 
           <div className="document-form">
-            <h3>Sự kiện truy xuất ({drawerBatch.events.length})</h3>
-            {selectedEvents.size > 0 && <div className="trace-bulk-bar">
-              <span>{selectedEvents.size} sự kiện đã chọn</span>
-              <button className="trace-bulk-approve" disabled={busy} onClick={() => bulkEventPublish(true)}>✓ Duyệt</button>
-              <button className="trace-bulk-hide" disabled={busy} onClick={() => bulkEventPublish(false)}>⊘ Ẩn</button>
-            </div>}
-            {drawerBatch.events.map(item => <div className="trace-row trace-event" key={item.id}>
-              <label className="check-label"><input type="checkbox" checked={selectedEvents.has(item.id)} onChange={() => toggleEventSelect(item.id)} /><b>{item.stage}: {item.title}</b></label>
-              <span><small>{new Date(item.occurredAt).toLocaleString('vi-VN')}</small><span className={`status ${item.isPublic ? '' : 'inactive'}`}>{item.isPublic ? 'Công khai' : 'Nháp'}</span></span>
-            </div>)}
-            {!drawerBatch.events.length && <p className="empty">Chưa có sự kiện.</p>}
-            <form className="trace-hanoicheck-form" onSubmit={createEvent}>
-              <input name="stage" placeholder="Khâu: cung cấp, vận chuyển, kiểm định…" required />
-              <input name="title" placeholder="Nội dung sự kiện" required />
-              <label>Thời điểm <input name="occurredAt" type="datetime-local" required /></label>
-              <input name="location" placeholder="Địa điểm (nếu công khai)" />
-              <button className="secondary-btn" disabled={busy}>＋ Thêm sự kiện</button>
-            </form>
+            <h3>Quy trình sản xuất</h3>
+            {drawerBatch.sourceSystem === 'HANOICHECK'
+              ? <p className="empty">Lô này đồng bộ từ HanoiCheck nên đã có sẵn quy trình — xem trên trang truy xuất công khai hoặc trên HanoiCheck.</p>
+              : <div className="trace-steps-list">
+                  {PRODUCTION_STEPS.map(step => {
+                    const stepEvent = drawerBatch.events.find(item => item.stage === step.key);
+                    const checked = Boolean(stepEvent?.isPublic);
+                    return <label className="trace-step-row" key={step.key}>
+                      <input type="checkbox" checked={checked} disabled={busy} onChange={() => toggleProductionStep(step.key, !checked)} />
+                      <div>
+                        <b>{step.title}</b>
+                        <small>{step.description}</small>
+                        {stepEvent?.performedBy && <small className="trace-step-performer">👤 {stepEvent.performedBy}{stepEvent.performedByRole ? ` · ${stepEvent.performedByRole}` : ''}</small>}
+                      </div>
+                    </label>;
+                  })}
+                </div>}
           </div>
         </>}
       </div>

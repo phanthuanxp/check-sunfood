@@ -25,6 +25,10 @@
 .trace-gtin-row{display:flex;gap:6px}
 .trace-gtin-row input{flex:1;min-width:0}
 .trace-gtin-row button{flex:0 0 auto;padding:0 12px;font-size:11px}
+.trace-image-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.trace-product-thumb{width:64px;height:64px;object-fit:cover;border-radius:10px;border:1px solid #d9e9dc;flex:0 0 auto}
+.trace-image-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.trace-image-actions input[type=file]{font-size:11px;max-width:220px}
 .trace-field-warning{margin:-2px 0 0;padding:8px 12px;border-radius:8px;background:#fff3ec;color:#a1401f;font-size:12px;font-weight:700}
 .trace-toolbar{align-items:center}
 .trace-toolbar h2{margin:0 0 4px}
@@ -89,4 +93,10 @@
 @media(max-width:850px){.trace-create-batch{grid-template-columns:1fr}.trace-toolbar{flex-direction:column;align-items:flex-start}.trace-batch-filters{flex-direction:column;align-items:stretch}.trace-date-filter{justify-content:space-between}}
 .trace-hanoicheck-form{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:10px}.trace-hanoicheck-form input{flex:1;min-width:260px}.trace-hanoicheck-form label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#587264}.trace-hanoicheck-form label input{flex:none;min-width:150px}.trace-hanoicheck-form button.outline{background:#fff;color:#0a7846;border:1px solid #0a7846}
 .trace-product-list{display:grid;gap:8px}
+.trace-steps-list{display:grid;gap:8px}
+.trace-step-row{display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border-radius:10px;background:#f6faf7;border:1px solid #deebe2;cursor:pointer}
+.trace-step-row input{margin-top:3px;flex:0 0 auto}
+.trace-step-row b{display:block;font-size:13px;color:#163b2a}
+.trace-step-row small{display:block;color:#668173;font-size:12px;margin-top:2px}
+.trace-step-performer{color:#0b6e40!important;font-weight:700}
 .trace-row{display:flex;justify-content:space-between;align-items:center;gap:15px;margin:8px 0}.trace-row>div{display:grid;gap:5px}.trace-row small{color:#718578}.trace-event{border-top:1px solid #e1e9e3;padding-top:12px}.trace-qr-links{display:flex;gap:12px;flex-wrap:wrap}.trace-qr-links a{color:#0a7846;font-weight:700}.trace-row button{flex-shrink:0}@media(max-width:850px){.trace-row{align-items:flex-start}.trace-row button{font-size:12px;padding:8px}}
