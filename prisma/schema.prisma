@@ -136,6 +136,7 @@ model Product {
   unit       String?
   storage    String?
   hygieneCertNumber String?
+  imageUrl   String?
   isPublic   Boolean   @default(false)
   supplier   Supplier  @relation(fields: [supplierId], references: [id], onDelete: Restrict)
   batches    Batch[]
