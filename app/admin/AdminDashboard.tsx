@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- QR and uploaded-document previews are dynamic API resources. */
 
 import { FormEvent, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { DataWarning } from "@/lib/data-warnings";
 import TraceWorkspace from "./trace/TraceWorkspace";
@@ -456,7 +457,7 @@ export default function AdminDashboard({
         aria-label="Thanh điều hướng quản trị"
       >
         <a href="/" className="admin-logo" aria-label="Về trang chủ Sunfood Tây Đô">
-          <span aria-hidden="true">SF</span>
+          <Image src="/brand/sunfood-logo.png" alt="" aria-hidden="true" width={44} height={44} />
           <div><b>Sunfood Tây Đô</b><small>Traceability Console</small></div>
         </a>
         <button

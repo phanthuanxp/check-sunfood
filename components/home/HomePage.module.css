@@ -50,19 +50,12 @@
 }
 
 .brandMark,
-.footerBrand > span {
+.footerBrand > img {
   width: 44px;
   height: 44px;
   flex: 0 0 44px;
-  display: grid;
-  place-items: center;
-  border-radius: 13px;
-  color: #fff;
-  background: linear-gradient(145deg, #11965a, #056238);
-  box-shadow: 0 9px 20px rgba(7, 111, 64, 0.19);
-  font-size: 16px;
-  font-weight: 900;
-  letter-spacing: -0.03em;
+  display: block;
+  object-fit: contain;
 }
 
 .brandCopy {
@@ -645,11 +638,6 @@
   gap: 12px;
 }
 
-.footerBrand > span {
-  background: rgba(255, 255, 255, 0.12);
-  box-shadow: none;
-}
-
 .footerBrand > div {
   display: grid;
   gap: 4px;
@@ -674,6 +662,13 @@
   margin: 4px 0;
   font-size: 11px;
   line-height: 1.5;
+}
+
+.footerCredit {
+  margin-top: 12px !important;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  color: #8fb8a2 !important;
 }
 
 .footerDetails a {

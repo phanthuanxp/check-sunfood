@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import styles from './HomePage.module.css';
 
@@ -10,7 +11,7 @@ export function HomeHeader({ supplierCount }: HomeHeaderProps) {
     <header className={styles.siteHeader}>
       <div className={styles.headerInner}>
         <Link className={styles.brand} href="/" aria-label="Trang chủ Sunfood Tây Đô">
-          <span className={styles.brandMark} aria-hidden="true">SF</span>
+          <Image className={styles.brandMark} src="/brand/sunfood-logo.png" alt="" aria-hidden="true" width={44} height={44} priority />
           <span className={styles.brandCopy}>
             <strong>SUNFOOD TÂY ĐÔ</strong>
             <small>Hệ thống truy xuất nguồn gốc</small>

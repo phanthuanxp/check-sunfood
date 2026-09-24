@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { connection } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { HomeHeader } from '@/components/home/HomeHeader';
@@ -71,21 +72,25 @@ export default async function Home() {
       <footer className={styles.footer} id="lien-he">
         <div className={styles.footerInner}>
           <div className={styles.footerBrand}>
-            <span aria-hidden="true">SF</span>
+            <Image src="/brand/sunfood-logo.png" alt="" aria-hidden="true" width={44} height={44} />
             <div>
               <strong>CÔNG TY CỔ PHẦN THỰC PHẨM SUNFOOD TÂY ĐÔ</strong>
               <small>Thực phẩm an toàn mỗi ngày</small>
             </div>
           </div>
           <div className={styles.footerDetails}>
-            <p>MST: 0110716043</p>
             <p>Số 17-19 Khu TT Cầu 1, đường Phan Bá Vành, phường Đông Ngạc, TP Hà Nội</p>
+            <p>MST: 0110716043 · Hotline: <a href="tel:0353010398">0353010398</a></p>
             <p>
               <a href="mailto:tpsunfoodtaydoo@gmail.com">tpsunfoodtaydoo@gmail.com</a>
               <span aria-hidden="true"> · </span>
               <a href="https://www.sunfoodtaydo.com" rel="noreferrer" target="_blank">
                 www.sunfoodtaydo.com
               </a>
+            </p>
+            <p className={styles.footerCredit}>
+              Vận hành bởi Công Ty CP Thương Mại Dịch Vụ 30Nice · <a href="tel:0345076789">0345 07 6789</a> ·{' '}
+              <a href="mailto:info@30nice.vn">info@30nice.vn</a>
             </p>
           </div>
         </div>
