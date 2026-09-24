@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { isBatchAvailable, findBatchByLotIdentifier } from '@/lib/trace-publish';
 import type { HcTraceDetail } from '@/lib/hanoicheck-trace';
+import { PRODUCTION_STEPS } from '@/lib/production-steps';
 import LotQrThumbnail from './LotQrThumbnail';
 import './lot.css';
 import './lot-status.css';
@@ -102,7 +103,11 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
   const sourceDetail = available ? parseHanoiCheckPayload(batch.sourceSystem, batch.sourcePayload) : null;
   const steps: DisplayStep[] = sourceDetail
     ? sourceDetail.steps.map(step => ({ key: step.code || step.index, title: step.title || `Khâu ${step.index}`, performedBy: step.performedBy, performedByRole: step.performedByRole, note: step.note }))
-    : available ? batch.events.map(event => ({ key: event.id, title: event.title, performedBy: event.performedBy, performedByRole: event.performedByRole, note: event.details })) : [];
+    : available ? PRODUCTION_STEPS
+        .map(step => batch.events.find(event => event.stage === step.key))
+        .filter((event): event is NonNullable<typeof event> => Boolean(event))
+        .map(event => ({ key: event.id, title: event.title, performedBy: event.performedBy, performedByRole: event.performedByRole, note: event.details }))
+      : [];
   const displayName = batch.name || product.name;
 
   type InfoRow = { key: string; kind: InfoRowKind; label: string; value: string; legalLink?: boolean };
