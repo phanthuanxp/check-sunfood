@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
-import { getAiRuntimeSettings } from '@/lib/ai-settings';
 import { prisma } from '@/lib/prisma';
 import PublicSupplier from './PublicSupplier';
 
@@ -72,6 +71,11 @@ function requestedLanguage(searchParams: Record<string, string | string[] | unde
   return raw === 'vi' || raw === 'en' ? raw : null;
 }
 
+function requestedTab(searchParams: Record<string, string | string[] | undefined>): 'source' | 'lots' | 'legal' | null {
+  const raw = Array.isArray(searchParams.tab) ? searchParams.tab[0] : searchParams.tab;
+  return raw === 'source' || raw === 'lots' || raw === 'legal' ? raw : null;
+}
+
 function siteOrigin() {
   const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
   if (configured) {
@@ -123,10 +127,9 @@ export default async function SupplierPage({ params, searchParams }: PageProps) 
   const supplier = await getPublicSupplier(code.trim().toUpperCase());
   if (!supplier) notFound();
 
-  const ai = await getAiRuntimeSettings();
   return <PublicSupplier
     supplier={JSON.parse(JSON.stringify(supplier))}
-    aiEnabled={ai.publicQaEnabled && Boolean(ai.apiKey) && supplier.status === 'ACTIVE' && supplier.verificationStatus === 'VERIFIED'}
     initialLanguage={requestedLanguage(query)}
+    initialTab={requestedTab(query)}
   />;
 }

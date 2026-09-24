@@ -10,6 +10,7 @@ export default function LotQrThumbnail({ batchCode }: { batchCode: string }) {
   return <>
     <button type="button" className="lot-hero-qr" onClick={() => setOpen(true)} aria-label={`Phóng to mã QR lô ${batchCode}`}>
       <img src={src} alt={`Mã QR lô ${batchCode}`} />
+      <span className="lot-hero-qr-label">Xem mã QR</span>
     </button>
     {open && <div className="lot-qr-modal-backdrop" onClick={() => setOpen(false)}>
       <div className="lot-qr-modal" onClick={event => event.stopPropagation()}>

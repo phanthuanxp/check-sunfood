@@ -12,7 +12,12 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   poweredByHeader: false,
   async headers() {
-    return [{ source: '/(.*)', headers: securityHeaders }];
+    return [
+      { source: '/(.*)', headers: securityHeaders },
+      // Legal-document PDFs are embedded in an <iframe> on the public supplier page;
+      // DENY (from the global rule above) would block that same-origin embed.
+      { source: '/api/files/:path*', headers: [{ key: 'X-Frame-Options', value: 'SAMEORIGIN' }] },
+    ];
   }
 };
 

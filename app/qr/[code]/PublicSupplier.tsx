@@ -1,7 +1,8 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 
 type Language = 'vi' | 'en';
 type TabKey = 'source' | 'lots' | 'legal';
@@ -32,7 +33,7 @@ type Supplier = {
 const LANGUAGE_STORAGE_KEY = 'sunfood-public-language';
 const VIETNAM_TIME_ZONE = 'Asia/Ho_Chi_Minh';
 const legalCategories = ['BUSINESS_LICENSE', 'FOOD_SAFETY', 'CONTRACT', 'OTHER', 'TESTING', 'VIETGAP', 'HACCP', 'ISO'];
-const tabKeys: TabKey[] = ['source', 'lots', 'legal'];
+const tabKeys: TabKey[] = ['source', 'legal', 'lots'];
 const categoryLabels = {
   vi: { BUSINESS_LICENSE: 'Đăng ký kinh doanh', FOOD_SAFETY: 'An toàn thực phẩm', CONTRACT: 'Hợp đồng', TESTING: 'Phiếu kiểm nghiệm', VIETGAP: 'VietGAP', HACCP: 'HACCP', ISO: 'ISO', OTHER: 'Hồ sơ khác' },
   en: { BUSINESS_LICENSE: 'Business registration', FOOD_SAFETY: 'Food safety', CONTRACT: 'Contract', TESTING: 'Test report', VIETGAP: 'VietGAP', HACCP: 'HACCP', ISO: 'ISO', OTHER: 'Other document' },
@@ -48,7 +49,7 @@ const copy = {
     issued: 'Cấp', expires: 'Hết hạn', notRecorded: 'Không ghi nhận', open: 'Mở ↗',
     noDocs: 'Chưa có hồ sơ công khai', legalEmpty: 'Sunfood chưa công bố tệp pháp lý được phép lưu trữ cho nhà cung cấp này.',
     trust: 'Cam kết minh bạch', trustText: 'Thông tin do Sunfood Tây Đô quản lý và cập nhật. Hồ sơ chỉ được công khai khi có quyền lưu trữ và công bố.',
-    translationNote: 'Nội dung này đang hiển thị theo hồ sơ gốc tiếng Việt.', aiUnavailable: 'Trợ lý tạm thời không khả dụng.',
+    translationNote: 'Nội dung này đang hiển thị theo hồ sơ gốc tiếng Việt.',
   },
   en: {
     tagline: 'Transparent sourcing — Confidence in every meal', verified: '✓ Verified', pending: '◷ Under review', system: 'PRODUCT TRACEABILITY SYSTEM',
@@ -60,7 +61,7 @@ const copy = {
     issued: 'Issued', expires: 'Expires', notRecorded: 'Not recorded', open: 'Open ↗',
     noDocs: 'No public documents', legalEmpty: 'Sunfood has not published any authorized legal documents for this supplier.',
     trust: 'Transparency commitment', trustText: 'Information is managed and updated by Sunfood Tây Đô. Documents are published only when storage and disclosure are authorized.',
-    translationNote: 'This field is shown from the original Vietnamese record.', aiUnavailable: 'The assistant is temporarily unavailable.',
+    translationNote: 'This field is shown from the original Vietnamese record.',
   },
 } as const;
 
@@ -101,24 +102,32 @@ function TranslationNote({ show, lang }: { show: boolean; lang: Language }) {
   return show ? <small className="field-note">{copy[lang].translationNote}</small> : null;
 }
 
-function DocumentList({ documents, lang, empty, emptyTitle }: { documents: Doc[]; lang: Language; empty: string; emptyTitle: string }) {
+/* eslint-disable @next/next/no-img-element -- admin-uploaded legal document image, not a static Next-optimizable asset. */
+function DocumentAccordion({ documents, lang, empty, emptyTitle }: { documents: Doc[]; lang: Language; empty: string; emptyTitle: string }) {
   const t = copy[lang];
-  return <div className="public-docs">{documents.length ? documents.map(document => <a href={document.fileUrl} target="_blank" rel="noreferrer" className="public-doc" key={document.id}>
-    <span className="file-icon">▤</span><span><b>{lang === 'en' ? (document.titleEn || document.title) : document.title}</b>
-      <TranslationNote show={lang === 'en' && !document.titleEn} lang={lang} />
-      <small>{categoryLabels[lang][document.category as keyof typeof categoryLabels.vi] || document.category} · {t.issued}: {formatDate(document.issuedAt, lang)} · {t.expires}: {formatDate(document.expiresAt, lang)}</small>
-    </span><strong>{t.open}</strong>
-  </a>) : <div className="empty-state"><span>◎</span><b>{emptyTitle}</b><p>{empty}</p></div>}</div>;
+  const [openId, setOpenId] = useState<number | null>(documents[0]?.id ?? null);
+  if (!documents.length) return <div className="empty-state"><span>◎</span><b>{emptyTitle}</b><p>{empty}</p></div>;
+  return <div className="public-docs">{documents.map(document => {
+    const isOpen = openId === document.id;
+    const isPdf = /\.pdf(?:\?|$)/i.test(document.fileUrl);
+    return <div className={`public-doc-item${isOpen ? ' open' : ''}`} key={document.id}>
+      <button type="button" className="public-doc" aria-expanded={isOpen} onClick={() => setOpenId(isOpen ? null : document.id)}>
+        <span className="file-icon">▤</span><span className="public-doc-title"><b>{lang === 'en' ? (document.titleEn || document.title) : document.title}</b>
+          <TranslationNote show={lang === 'en' && !document.titleEn} lang={lang} />
+          <small>{categoryLabels[lang][document.category as keyof typeof categoryLabels.vi] || document.category} · {t.issued}: {formatDate(document.issuedAt, lang)} · {t.expires}: {formatDate(document.expiresAt, lang)}</small>
+        </span><span className="public-doc-chevron" aria-hidden="true">⌄</span>
+      </button>
+      {isOpen && <div className="public-doc-body">
+        {isPdf ? <iframe src={document.fileUrl} title={document.title} className="public-doc-frame" /> : <img src={document.fileUrl} alt={document.title} className="public-doc-image" />}
+        <a href={document.fileUrl} target="_blank" rel="noreferrer" className="public-doc-openlink">{t.open}</a>
+      </div>}
+    </div>;
+  })}</div>;
 }
 
-export default function PublicSupplier({ supplier, aiEnabled, initialLanguage }: { supplier: Supplier; aiEnabled: boolean; initialLanguage: Language | null }) {
-  const [tab, setTab] = useState<TabKey>('source');
+export default function PublicSupplier({ supplier, initialLanguage, initialTab }: { supplier: Supplier; initialLanguage: Language | null; initialTab?: TabKey | null }) {
+  const [tab, setTab] = useState<TabKey>(initialTab || 'source');
   const [languageOverride, setLanguageOverride] = useState<Language | null>(null);
-  const [question, setQuestion] = useState('');
-  const [aiBusy, setAiBusy] = useState(false);
-  const [aiError, setAiError] = useState('');
-  const [aiAnswer, setAiAnswer] = useState<{ answer: string; sources: { id: string; label: string; href: string }[] } | null>(null);
-  const aiRequestId = useRef(0);
   const hydrated = useSyncExternalStore(subscribeToHydration, () => true, () => false);
   const lang = languageOverride || initialLanguage || (hydrated ? readStoredLanguage() : null) || 'vi';
   const t = copy[lang];
@@ -134,11 +143,7 @@ export default function PublicSupplier({ supplier, aiEnabled, initialLanguage }:
 
   function changeLanguage(nextLanguage: Language) {
     if (nextLanguage === lang) return;
-    aiRequestId.current += 1;
     setLanguageOverride(nextLanguage);
-    setAiAnswer(null);
-    setAiError('');
-    setAiBusy(false);
     document.documentElement.lang = nextLanguage;
     try { window.localStorage.setItem(LANGUAGE_STORAGE_KEY, nextLanguage); } catch { /* Storage is optional. */ }
     const url = new URL(window.location.href);
@@ -163,23 +168,6 @@ export default function PublicSupplier({ supplier, aiEnabled, initialLanguage }:
     selectTab(tabKeys[next], true);
   }
 
-  async function askAi(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!aiEnabled || !question.trim()) return;
-    const requestId = ++aiRequestId.current;
-    setAiBusy(true); setAiError(''); setAiAnswer(null);
-    try {
-      const response = await fetch('/api/ai/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: supplier.code, question, language: lang }) });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || t.aiUnavailable);
-      if (aiRequestId.current === requestId) setAiAnswer(result);
-    } catch (error) {
-      if (aiRequestId.current === requestId) setAiError(error instanceof Error ? error.message : t.aiUnavailable);
-    } finally {
-      if (aiRequestId.current === requestId) setAiBusy(false);
-    }
-  }
-
   const legalDocs = supplier.documents.filter(document => legalCategories.includes(document.category));
   const isVerified = supplier.verificationStatus === 'VERIFIED';
   const product = localized(supplier.productName, supplier.productNameEn, lang, t.productFallback);
@@ -188,7 +176,7 @@ export default function PublicSupplier({ supplier, aiEnabled, initialLanguage }:
   const description = localized(supplier.description, supplier.descriptionEn, lang, t.descriptionFallback);
   const website = supplier.website ? websiteHref(supplier.website) : null;
 
-  return <main className="trace-page"><header className="trace-header"><Link href="/" className="trace-logo"><span>SF</span><div><b>SUNFOOD TÂY ĐÔ</b><small>{t.tagline}</small></div></Link><div className="trace-header-actions"><div className="language-switch" role="group" aria-label={t.language}>
+  return <main className="trace-page"><header className="trace-header"><Link href="/" className="trace-logo"><Image src="/brand/sunfood-logo.png" alt="" width={44} height={44} /><div><b>SUNFOOD TÂY ĐÔ</b><small>{t.tagline}</small></div></Link><div className="trace-header-actions"><div className="language-switch" role="group" aria-label={t.language}>
     <button type="button" className={lang === 'vi' ? 'active' : ''} aria-pressed={lang === 'vi'} onClick={() => changeLanguage('vi')}>VI</button>
     <button type="button" className={lang === 'en' ? 'active' : ''} aria-pressed={lang === 'en'} onClick={() => changeLanguage('en')}>EN</button>
   </div><span className={isVerified ? 'verified' : 'verified pending'}>{isVerified ? t.verified : t.pending}</span></div></header>
@@ -208,8 +196,8 @@ export default function PublicSupplier({ supplier, aiEnabled, initialLanguage }:
           <article className="wide"><span>i</span><div><label>{t.description}</label><p>{description}</p><TranslationNote show={lang === 'en' && !supplier.descriptionEn && Boolean(supplier.description)} lang={lang} /></div></article>
         </div>}
         {tab === 'lots' && <div className="public-lots">{isVerified && supplier.status === 'ACTIVE' && supplier.products.some(item => item.batches.length) ? supplier.products.flatMap(item => item.batches.map(batch => <Link className="public-lot" href={`/lot/${encodeURIComponent(batch.code)}?lang=${lang}`} key={batch.publicId}><span><b>{batch.name || item.name}</b><small>{lang === 'vi' ? 'Mã lô' : 'Lot code'}: {batch.code} · {lang === 'vi' ? 'Ngày nhập' : 'Received'}: {formatDate(batch.receivedAt, lang)}</small></span><strong>{lang === 'vi' ? 'Xem lô →' : 'View lot →'}</strong></Link>)) : <div className="empty-state"><span>▣</span><b>{lang === 'vi' ? 'Chưa có lô được công bố' : 'No published lots'}</b><p>{lang === 'vi' ? 'Lô nhập hàng chỉ xuất hiện sau khi thông tin và nhà cung cấp được xác minh.' : 'Inbound lots appear after the supplier and lot data are verified.'}</p></div>}</div>}
-        {tab === 'legal' && <DocumentList documents={legalDocs} lang={lang} empty={t.legalEmpty} emptyTitle={t.noDocs} />}
-      </div><section className="trace-ai"><div><b>{lang === 'vi' ? 'Hỏi về nguồn gốc' : 'Ask about this source'}</b><p>{aiEnabled ? (lang === 'vi' ? 'Trợ lý chỉ dùng dữ liệu nhà cung cấp đã xác minh và hồ sơ công khai.' : 'Answers use only verified supplier data and public document metadata.') : (lang === 'vi' ? 'Trợ lý sẽ mở khi dữ liệu nhà cung cấp được xác minh và hệ thống AI được cấu hình.' : 'The assistant will open after supplier verification and AI setup.')}</p></div>{aiEnabled && <form onSubmit={askAi}><input value={question} onChange={event => setQuestion(event.target.value)} maxLength={300} placeholder={lang === 'vi' ? 'Ví dụ: Nhà cung cấp này có hồ sơ gì?' : 'For example: Which documents are available?'} aria-label={lang === 'vi' ? 'Câu hỏi về nguồn gốc' : 'Traceability question'} required /><button disabled={aiBusy}>{aiBusy ? '…' : lang === 'vi' ? 'Hỏi AI' : 'Ask AI'}</button></form>}{aiError && <p role="alert">{aiError}</p>}{aiAnswer && <div className="trace-ai-answer"><p>{aiAnswer.answer}</p>{aiAnswer.sources.length > 0 && <div>{aiAnswer.sources.map(source => <a key={source.id} href={source.href} target={source.id === 'supplier' ? undefined : '_blank'} rel="noreferrer">{source.label} ↗</a>)}</div>}</div>}<small>{lang === 'vi' ? 'AI không xác nhận tính thật của giấy tờ hoặc độ an toàn của sản phẩm.' : 'AI does not certify documents or food safety.'}</small></section><div className="trust-note"><span>✓</span><p><b>{t.trust}</b><br />{t.trustText}</p></div>
-    </section><footer className="trace-footer"><b>CÔNG TY CỔ PHẦN THỰC PHẨM SUNFOOD TÂY ĐÔ</b><p>{lang === 'vi' ? 'MST 0110716043 · Số 17-19 Khu TT Cầu 1, đường Phan Bá Vành, phường Đông Ngạc, TP Hà Nội' : 'Tax ID 0110716043 · No. 17-19 Cau 1 Collective Area, Phan Ba Vanh Street, Dong Ngac Ward, Hanoi, Vietnam'}</p><p>tpsunfoodtaydoo@gmail.com · www.sunfoodtaydo.com</p></footer>
+        {tab === 'legal' && <DocumentAccordion documents={legalDocs} lang={lang} empty={t.legalEmpty} emptyTitle={t.noDocs} />}
+      </div><div className="trust-note"><span>✓</span><p><b>{t.trust}</b><br />{t.trustText}</p></div>
+    </section><footer className="trace-footer"><b>CÔNG TY CỔ PHẦN THỰC PHẨM SUNFOOD TÂY ĐÔ</b><p>{lang === 'vi' ? 'Số 17-19 Khu TT Cầu 1, đường Phan Bá Vành, phường Đông Ngạc, TP Hà Nội' : 'No. 17-19 Cau 1 Collective Area, Phan Ba Vanh Street, Dong Ngac Ward, Hanoi, Vietnam'}</p><p>{lang === 'vi' ? 'MST: 0110716043 · Hotline: 0353010398' : 'Tax ID: 0110716043 · Hotline: 0353010398'}</p><p>tpsunfoodtaydoo@gmail.com · www.sunfoodtaydo.com</p><p className="trace-footer-credit">{lang === 'vi' ? 'Vận hành bởi Công Ty CP Thương Mại Dịch Vụ 30Nice · 0345 07 6789 · info@30nice.vn' : 'Operated by 30Nice Trading Services JSC · 0345 07 6789 · info@30nice.vn'}</p></footer>
   </main>;
 }

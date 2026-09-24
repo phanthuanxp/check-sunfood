@@ -3,21 +3,40 @@
    only the lot-specific content below keeps its own rules. */
 .lot-page { color: #163b2a; font-family: inherit; font-size: 15px; }
 .lot-hero-address { margin: 3px 0 0; font-size: 13px; color: #a9d6bc; line-height: 1.4; max-width: 640px; }
-.lot-hero-badge { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 14px; color: #fff; font-size: 13px; font-weight: 700; }
+.lot-hero-badge { display: inline-flex; align-items: center; gap: 6px; width: fit-content; padding: 6px 12px; border-radius: 999px; background: #e8f7ef; color: #087a43; font-size: 12px; font-weight: 700; }
 .lot-page .code-pill b { color: #fff; }
 
-.lot-hero-codes { display: flex; gap: 28px; flex-wrap: nowrap; margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.18); }
-.lot-page .lot-hero-codes .code-pill { display: inline-flex; align-items: baseline; gap: 6px; background: none; border: 0; border-radius: 0; padding: 0; min-height: 0; color: #bcead0; font-size: 13px; font-weight: 400; flex: 0 0 auto; }
-.lot-page .lot-hero-codes .code-pill b { font-size: 14px; font-weight: 800; }
-.lot-page .lot-hero-codes .code-pill:last-child { flex: 1 1 auto; min-width: 0; }
-.lot-page .lot-hero-codes .code-pill:last-child b { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.lot-hero-top-row { display: flex; align-items: stretch; justify-content: space-between; gap: 14px; }
+.lot-hero-meta { display: flex; flex-direction: column; justify-content: space-between; gap: 8px; }
+.lot-hero-code-row { font-size: 13px; color: #bcead0; font-weight: 400; }
+.lot-hero-code-row b { margin-left: 4px; font-size: 14px; font-weight: 800; color: #fff; }
+
+.lot-photo-block { margin: 18px 0 6px; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 22px rgba(15, 50, 33, 0.14); background: #eef4f0; display: flex; align-items: center; justify-content: center; }
+.lot-photo-block img { display: block; width: 100%; max-height: 100%; object-fit: contain; }
+.lot-title { margin: 16px 0 14px; font-size: 22px; line-height: 1.25; font-weight: 800; color: #0e3323; display: flex; align-items: baseline; }
+
+@media (min-width: 640px) {
+  .lot-title { font-size: 25px; }
+}
+
+.lot-row-icon { flex: 0 0 auto; width: 30px; height: 30px; margin-top: 1px; border-radius: 9px; display: grid; place-items: center; }
+.lot-row-icon svg { width: 16px; height: 16px; }
+.lot-row-icon-received, .lot-row-icon-produced, .lot-row-icon-shelfLife, .lot-row-icon-supplier { background: #e3f6e9; color: #0b6e40; }
+.lot-row-icon-expires { background: #fde3e3; color: #c23b3b; }
+.lot-row-icon-storage { background: #e3eefd; color: #2563c2; }
+.lot-row-icon-address { background: #f1e7fb; color: #7c3fc4; }
+.lot-row-icon-box { background: #fdecdc; color: #c2711e; }
+
+.lot-legal-link { display: flex; width: 100%; align-items: center; justify-content: center; gap: 6px; margin-top: 10px; padding: 9px 12px; border-radius: 20px; border: 1.5px solid #0b7648; color: #0b7648 !important; font-size: 13px; font-weight: 700 !important; text-decoration: none; white-space: nowrap; box-sizing: border-box; }
+.lot-legal-link:hover { background: #f0faf3; }
+.lot-legal-link-icon { flex: 0 0 auto; width: 14px; height: 14px; }
+.lot-legal-link-arrow { margin-left: 1px; font-size: 15px; line-height: 1; }
 .lot-hero-title-icon { margin-right: 10px; }
 .lot-page .trace-hero { min-height: 0; }
 
-.lot-hero-has-qr .lot-hero-badge,
-.lot-hero-has-qr .hero-content h1 { margin-right: 116px; }
-.lot-hero-qr { position: absolute; top: 28px; right: 24px; width: 84px; height: 84px; padding: 6px; background: #fff; border: 0; border-radius: 10px; cursor: pointer; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.3); }
-.lot-hero-qr img { display: block; width: 100%; height: 100%; }
+.lot-hero-qr { flex: 0 0 auto; align-self: center; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px; background: #fff; border: 0; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22); }
+.lot-hero-qr img { display: block; width: 85px; height: 85px; }
+.lot-hero-qr-label { font-size: 10px; font-weight: 700; color: #0b7648; line-height: 1.2; }
 .lot-qr-modal-backdrop { position: fixed; inset: 0; z-index: 60; background: rgba(6, 30, 20, 0.72); display: grid; place-items: center; padding: 20px; }
 .lot-qr-modal { width: min(320px, 100%); background: #fff; border-radius: 16px; padding: 24px; text-align: center; position: relative; }
 .lot-qr-modal img { width: 100%; height: auto; }
@@ -43,10 +62,10 @@
 .lot-source { margin: 16px 0 0; color: #5a7565; font-size: 12px; line-height: 1.5; }
 
 .lot-info-rows { display: grid; gap: 0; margin: 0; }
-.lot-info-rows > div { display: flex; align-items: baseline; gap: 10px; padding: 11px 0; border-bottom: 1px solid #eef4f0; }
+.lot-info-rows > div { display: flex; align-items: flex-start; gap: 10px; padding: 11px 0; border-bottom: 1px solid #eef4f0; }
 .lot-info-rows > div:last-child { border-bottom: 0; padding-bottom: 0; }
-.lot-info-rows dt { flex: 0 0 118px; font-size: 13px; color: #668173; }
-.lot-info-rows dd { flex: 1; margin: 0; font-size: 14px; font-weight: 700; color: #163b2a; text-align: left; line-height: 1.45; overflow-wrap: anywhere; }
+.lot-info-rows dt { flex: 0 0 108px; margin-top: 6px; font-size: 13px; color: #668173; }
+.lot-info-rows dd { flex: 1; margin: 3px 0 0; font-size: 14px; font-weight: 700; color: #163b2a; text-align: left; line-height: 1.45; overflow-wrap: anywhere; }
 
 .lot-process { list-style: none; padding: 0; margin: 0; }
 .lot-process li { display: flex; gap: 12px; padding-bottom: 22px; position: relative; }
@@ -73,12 +92,9 @@
 }
 
 @media (max-width: 640px) {
-  .lot-hero-qr { top: 20px; right: 16px; width: 80px; height: 80px; padding: 4px; border-radius: 8px; }
-  .lot-hero-has-qr .lot-hero-badge,
-  .lot-hero-has-qr .hero-content h1 { margin-right: 104px; }
   .lot-page .trace-hero { border-radius: 0; }
-  .lot-page .hero-content h1 { margin-top: 12px; margin-bottom: 18px; font-size: 25px; line-height: 1.15; }
-  .lot-hero-codes { gap: 16px; }
-  .lot-page .lot-hero-codes .code-pill { font-size: 11px; }
-  .lot-page .lot-hero-codes .code-pill b { font-size: 12px; }
+  .lot-title { font-size: 20px; margin: 14px 0 12px; }
+  .lot-row-icon { width: 26px; height: 26px; border-radius: 8px; }
+  .lot-row-icon svg { width: 14px; height: 14px; }
+  .lot-info-rows dt { flex-basis: 92px; }
 }
