@@ -87,18 +87,18 @@ export function TraceabilityHero() {
             hồ sơ pháp lý và giấy tờ kiểm định do <strong>Sunfood Tây Đô</strong> quản lý.
           </p>
 
-          <div className="traceability-hero__actions">
+          <nav className="traceability-hero__actions" aria-label="Lối tắt truy xuất">
             <a className="traceability-button traceability-button--primary" href="#danh-sach-ncc">
-              Tra cứu ngay <span aria-hidden="true">→</span>
+              Tra cứu nhà cung cấp <span aria-hidden="true">→</span>
             </a>
-            <a className="traceability-button traceability-button--secondary" href="#danh-sach-ncc">
-              Xem danh sách NCC <span aria-hidden="true">→</span>
+            <a className="traceability-button traceability-button--secondary" href="#quy-trinh">
+              Xem cách kiểm tra <span aria-hidden="true">→</span>
             </a>
-          </div>
+          </nav>
 
-          <div className="traceability-hero__features" aria-label="Cam kết của Sunfood Tây Đô">
+          <div className="traceability-hero__features" role="list" aria-label="Cam kết của Sunfood Tây Đô">
             {features.map((feature) => (
-              <div className="traceability-feature" key={feature.title}>
+              <div className="traceability-feature" role="listitem" key={feature.title}>
                 <span className="traceability-feature__icon">{feature.icon}</span>
                 <span>
                   <strong>{feature.title}</strong>

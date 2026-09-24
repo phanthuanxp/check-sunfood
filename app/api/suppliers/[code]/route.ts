@@ -8,7 +8,8 @@ import { rejectUntrustedMutation } from '@/lib/security';
 export async function GET(_: Request, { params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
   const supplier = await prisma.supplier.findUnique({ where: { code: code.toUpperCase() }, select: {
-    id:true, code:true, name:true, nameEn:true, productName:true, productNameEn:true, address:true, addressEn:true, taxCode:true, storage:true, storageEn:true, shelfLife:true, shelfLifeEn:true,
+    id:true, code:true, name:true, nameEn:true, productName:true, productNameEn:true, address:true, addressEn:true, taxCode:true,
+    phone:true, website:true, email:true, description:true, descriptionEn:true, storage:true, storageEn:true, shelfLife:true, shelfLifeEn:true,
     status:true, verificationStatus:true, notes:true, notesEn:true, createdAt:true, updatedAt:true, documents: { where: { isPublic: true } }
   }});
   if (!supplier) return NextResponse.json({ error: 'Supplier not found' }, { status: 404 });

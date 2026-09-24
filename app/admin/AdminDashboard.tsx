@@ -38,6 +38,11 @@ type Supplier = {
   address: string | null;
   addressEn: string | null;
   taxCode: string | null;
+  phone: string | null;
+  website: string | null;
+  email: string | null;
+  description: string | null;
+  descriptionEn: string | null;
   storage: string | null;
   storageEn: string | null;
   shelfLife: string | null;
@@ -65,6 +70,11 @@ const emptySupplier = {
   address: "",
   addressEn: "",
   taxCode: "",
+  phone: "",
+  website: "",
+  email: "",
+  description: "",
+  descriptionEn: "",
   storage: "",
   storageEn: "",
   shelfLife: "",
@@ -174,6 +184,7 @@ export default function AdminDashboard({
         .length,
       expired: docs.filter((d) => expiry(d.expiresAt).key === "expired").length,
       missing: suppliers.filter((s) => s.documents.length === 0).length,
+      active: suppliers.filter((s) => s.status === "ACTIVE").length,
       verified: suppliers.filter((s) => s.verificationStatus === "VERIFIED").length,
       publicDocs: docs.filter((d) => d.isPublic).length,
     }),
@@ -417,12 +428,12 @@ export default function AdminDashboard({
   }
 
   const viewTitle = {
-    overview: ["Tổng quan", "Theo dõi sức khỏe dữ liệu và hoạt động toàn hệ thống."],
+    overview: ["Tổng quan", "Theo dõi tình trạng nhà cung cấp, hồ sơ và các việc cần xử lý."],
     suppliers: ["Quản lý nhà cung cấp", "Xem, chỉnh sửa, cập nhật hồ sơ và trạng thái từng nhà cung cấp."],
-    qr: ["Thư viện mã QR", "Quản lý và tải mã truy xuất riêng của từng nhà cung cấp."],
+    qr: ["Thư viện QR nhà cung cấp", "Quản lý và tải mã truy xuất cố định của từng nhà cung cấp."],
     audit: ["Nhật ký hoạt động", "Theo dõi các thay đổi dữ liệu gần nhất trong hệ thống."],
     warnings: ["Cảnh báo dữ liệu", "Quy tắc xác định tự động: hồ sơ hết hạn, thiếu dữ liệu, mã số thuế/tên trùng lặp. Không dùng AI cho các quyết định này."],
-    batches: ["QL lô nhập hàng", "Đồng bộ, duyệt công khai và in QR cho từng lô nhập hàng từ HanoiCheck."],
+    batches: ["Quản lý lô nhập hàng", "Đồng bộ, duyệt công khai và in QR cho từng lô nhập hàng từ HanoiCheck."],
     settings: ["Cài đặt", "Tài khoản, cấu hình AI, kết nối HanoiCheck và các tác vụ cấu hình khác của dự án."],
   }[activeView];
   const warningStats = useMemo(() => ({
@@ -440,69 +451,108 @@ export default function AdminDashboard({
 
   return (
     <main className={`admin-shell${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
-      <aside className={`admin-sidebar${sidebarCollapsed ? " collapsed" : ""}`}>
-        <a href="/" className="admin-logo">
-          <span>SF</span>
+      <aside
+        className={`admin-sidebar${sidebarCollapsed ? " collapsed" : ""}`}
+        aria-label="Thanh điều hướng quản trị"
+      >
+        <a href="/" className="admin-logo" aria-label="Về trang chủ Sunfood Tây Đô">
+          <span aria-hidden="true">SF</span>
           <div><b>Sunfood Tây Đô</b><small>Traceability Console</small></div>
         </a>
-        <button className="sidebar-collapse-toggle" onClick={toggleSidebar} title={sidebarCollapsed ? "Mở rộng menu" : "Thu gọn menu"}>{sidebarCollapsed ? "»" : "«"}</button>
+        <button
+          type="button"
+          className="sidebar-collapse-toggle"
+          onClick={toggleSidebar}
+          title={sidebarCollapsed ? "Mở rộng menu" : "Thu gọn menu"}
+          aria-label={sidebarCollapsed ? "Mở rộng menu quản trị" : "Thu gọn menu quản trị"}
+          aria-controls="admin-primary-navigation"
+          aria-expanded={!sidebarCollapsed}
+        >
+          <span aria-hidden="true">{sidebarCollapsed ? "»" : "«"}</span>
+        </button>
         <p className="sidebar-label">QUẢN LÝ</p>
-        <nav>
-          <button className={activeView === "overview" ? "active" : ""} onClick={() => setActiveView("overview")} title="Tổng quan">
-            <span>⌂</span><b>Tổng quan</b>
+        <nav id="admin-primary-navigation" aria-label="Điều hướng quản trị chính">
+          <button type="button" className={activeView === "overview" ? "active" : ""} onClick={() => setActiveView("overview")} title="Mở Tổng quan" aria-current={activeView === "overview" ? "page" : undefined}>
+            <span aria-hidden="true">⌂</span><b>Tổng quan</b>
           </button>
-          <button className={activeView === "suppliers" ? "active" : ""} onClick={() => setActiveView("suppliers")} title="Nhà cung cấp"><span>◇</span><b>Nhà cung cấp</b></button>
-          <button className={activeView === "batches" ? "active" : ""} onClick={() => setActiveView("batches")} title="QL lô nhập hàng"><span>◎</span><b>QL lô nhập hàng</b></button>
-          <button className={activeView === "qr" ? "active" : ""} onClick={() => setActiveView("qr")} title="Thư viện QR"><span>▦</span><b>Thư viện QR</b></button>
-          <button className={activeView === "warnings" ? "active" : ""} onClick={() => setActiveView("warnings")} title="Cảnh báo dữ liệu"><span>⚠</span><b>Cảnh báo dữ liệu</b>{warningStats.critical > 0 && <em className="nav-badge">{warningStats.critical}</em>}</button>
-          <button className={activeView === "audit" ? "active" : ""} onClick={() => setActiveView("audit")} title="Nhật ký"><span>◷</span><b>Nhật ký</b></button>
-          <button className={activeView === "settings" ? "active" : ""} onClick={() => setActiveView("settings")} title="Cài đặt"><span>⚙</span><b>Cài đặt</b></button>
+          <button type="button" className={activeView === "suppliers" ? "active" : ""} onClick={() => setActiveView("suppliers")} title="Mở Quản lý nhà cung cấp" aria-current={activeView === "suppliers" ? "page" : undefined}><span aria-hidden="true">◇</span><b>Nhà cung cấp</b></button>
+          <button type="button" className={activeView === "batches" ? "active" : ""} onClick={() => setActiveView("batches")} title="Mở Quản lý lô nhập hàng" aria-current={activeView === "batches" ? "page" : undefined}><span aria-hidden="true">◎</span><b>Lô nhập hàng</b></button>
+          <button type="button" className={activeView === "qr" ? "active" : ""} onClick={() => setActiveView("qr")} title="Mở Thư viện QR nhà cung cấp" aria-current={activeView === "qr" ? "page" : undefined}><span aria-hidden="true">▦</span><b>Thư viện QR</b></button>
+          <button type="button" className={activeView === "warnings" ? "active" : ""} onClick={() => setActiveView("warnings")} title="Mở Cảnh báo dữ liệu" aria-current={activeView === "warnings" ? "page" : undefined}><span aria-hidden="true">⚠</span><b>Cảnh báo dữ liệu</b>{warningStats.critical > 0 && <em className="nav-badge" aria-label={`${warningStats.critical} cảnh báo khẩn cấp`}>{warningStats.critical}</em>}</button>
+          <button type="button" className={activeView === "audit" ? "active" : ""} onClick={() => setActiveView("audit")} title="Mở Nhật ký hoạt động" aria-current={activeView === "audit" ? "page" : undefined}><span aria-hidden="true">◷</span><b>Nhật ký</b></button>
+          <button type="button" className={activeView === "settings" ? "active" : ""} onClick={() => setActiveView("settings")} title="Mở Cài đặt" aria-current={activeView === "settings" ? "page" : undefined}><span aria-hidden="true">⚙</span><b>Cài đặt</b></button>
         </nav>
-        <div className="sidebar-account"><div className="admin-avatar">A</div><div><b>Quản trị viên</b><small>Administrator</small></div><button onClick={logout} title="Đăng xuất">↪</button></div>
+        <div className="sidebar-account"><div className="admin-avatar" aria-hidden="true">A</div><div><b>Quản trị viên</b><small>Administrator</small></div><button type="button" onClick={logout} title="Đăng xuất khỏi trang quản trị" aria-label="Đăng xuất khỏi trang quản trị">↪</button></div>
       </aside>
-      <section className="admin-content">
+      <section className="admin-content" id="admin-main-content" aria-labelledby="admin-view-title" tabIndex={-1}>
         <header className="admin-top">
           <div>
             <p className="admin-breadcrumb">Trang quản trị <span>/</span> {viewTitle[0]}</p>
-            <h1>{viewTitle[0]}</h1>
+            <h1 id="admin-view-title">{viewTitle[0]}</h1>
             <p className="admin-subtitle">{viewTitle[1]}</p>
           </div>
-          <div className="top-actions">
-            <a className="secondary-btn" href="/api/qr/bulk">
-              Tải toàn bộ QR
-            </a>
-            <button className="secondary-btn" onClick={exportCsv}>
-              Xuất CSV
-            </button>
-            <button className="primary-btn" onClick={() => editSupplier()}>
-              + Thêm NCC
-            </button>
-          </div>
+          {(activeView === "overview" || activeView === "suppliers" || activeView === "qr" || activeView === "warnings") && (
+            <div className="top-actions" role="group" aria-label={`Hành động cho mục ${viewTitle[0]}`}>
+              {activeView === "qr" && (
+                <a className="primary-btn" href="/api/qr/bulk" title="Tải toàn bộ mã QR nhà cung cấp dạng ZIP">
+                  Tải ZIP toàn bộ QR
+                </a>
+              )}
+              {(activeView === "suppliers" || activeView === "warnings") && (
+                <button type="button" className="secondary-btn" onClick={exportCsv} title="Xuất danh sách nhà cung cấp và tình trạng hồ sơ">
+                  Xuất danh sách CSV
+                </button>
+              )}
+              {(activeView === "overview" || activeView === "suppliers") && (
+                <button type="button" className="primary-btn" onClick={() => editSupplier()} title="Tạo hồ sơ nhà cung cấp mới">
+                  + Thêm nhà cung cấp
+                </button>
+              )}
+            </div>
+          )}
         </header>
-        {message && <div className="notice">{message}</div>}
-        <div className={`stat-grid admin-view ${activeView === "overview" ? "" : "is-hidden"}`} id="dashboard">
-          <button className="stat-card primary-stat" onClick={() => { setExpiryFilter("all"); setActiveView("suppliers"); }}>
-            <span className="stat-symbol">◇</span><div><span>Nhà cung cấp</span><b>{stats.total}</b><small>Tổng số đang quản lý</small></div>
+        {message && <div className="notice" role="status" aria-live="polite">{message}</div>}
+        <div className={`stat-grid admin-view ${activeView === "overview" ? "" : "is-hidden"}`} id="dashboard" aria-label="Chỉ số tổng quan">
+          <button type="button" className="stat-card primary-stat" onClick={() => { setExpiryFilter("all"); setActiveView("suppliers"); }} title="Xem toàn bộ nhà cung cấp">
+            <span className="stat-symbol" aria-hidden="true">◇</span><div><span>Nhà cung cấp</span><b>{stats.total}</b><small>{stats.active} đang hoạt động</small></div>
           </button>
-          <button className="stat-card good" onClick={() => { setExpiryFilter("valid"); setActiveView("suppliers"); }}>
-            <span className="stat-symbol">✓</span><div><span>Hồ sơ hiệu lực</span><b>{stats.valid}</b><small>Đang còn giá trị</small></div>
+          <button type="button" className="stat-card good" onClick={() => { setExpiryFilter("valid"); setActiveView("suppliers"); }} title="Lọc nhà cung cấp có hồ sơ còn hiệu lực">
+            <span className="stat-symbol" aria-hidden="true">✓</span><div><span>Hồ sơ hiệu lực</span><b>{stats.valid}</b><small>Đang còn giá trị</small></div>
           </button>
-          <button className="stat-card warn" onClick={() => { setExpiryFilter("warning"); setActiveView("suppliers"); }}>
-            <span className="stat-symbol">!</span><div><span>Sắp hết hạn</span><b>{stats.warning}</b><small>Trong vòng 90 ngày</small></div>
+          <button type="button" className="stat-card warn" onClick={() => { setExpiryFilter("warning"); setActiveView("suppliers"); }} title="Lọc hồ sơ hết hạn trong vòng 90 ngày">
+            <span className="stat-symbol" aria-hidden="true">!</span><div><span>Sắp hết hạn</span><b>{stats.warning}</b><small>Trong vòng 90 ngày</small></div>
           </button>
-          <button className="stat-card bad" onClick={() => { setExpiryFilter("expired"); setActiveView("suppliers"); }}>
-            <span className="stat-symbol">×</span><div><span>Đã hết hạn</span><b>{stats.expired}</b><small>Cần xử lý ngay</small></div>
+          <button type="button" className="stat-card bad" onClick={() => { setExpiryFilter("expired"); setActiveView("suppliers"); }} title="Lọc hồ sơ đã hết hạn">
+            <span className="stat-symbol" aria-hidden="true">×</span><div><span>Đã hết hạn</span><b>{stats.expired}</b><small>Cần xử lý ngay</small></div>
           </button>
           <button
+            type="button"
             className="stat-card neutral"
             onClick={() => { setExpiryFilter("missing"); setActiveView("suppliers"); }}
+            title="Lọc nhà cung cấp chưa có hồ sơ"
           >
-            <span className="stat-symbol">＋</span><div><span>Thiếu hồ sơ</span><b>{stats.missing}</b><small>Chưa có tài liệu</small></div>
+            <span className="stat-symbol" aria-hidden="true">＋</span><div><span>Thiếu hồ sơ</span><b>{stats.missing}</b><small>Chưa có tài liệu</small></div>
           </button>
         </div>
-        <section className={`overview-detail admin-view ${activeView === "overview" ? "" : "is-hidden"}`}>
-          <article className="panel system-health"><div className="panel-head"><div><p className="panel-kicker">HỆ THỐNG</p><h2>Tình trạng dữ liệu</h2></div><span className="health-online">● Hoạt động ổn định</span></div><div className="health-list"><div><span>Cơ sở dữ liệu</span><b>SQLite localhost</b></div><div><span>Nhà cung cấp đã xác minh</span><b>{stats.verified}/{stats.total}</b></div><div><span>Hồ sơ được công khai</span><b>{stats.publicDocs}/{docs.length}</b></div><div><span>URL QR ổn định</span><b>NCC-01 → NCC-23</b></div></div></article>
-          <article className="panel attention-panel"><div className="panel-head"><div><p className="panel-kicker">CẦN CHÚ Ý</p><h2>Ưu tiên xử lý</h2></div></div><div className="attention-list"><button onClick={() => { setExpiryFilter("missing"); setActiveView("suppliers"); }}><span className="attention-icon critical">!</span><div><b>{stats.missing} nhà cung cấp thiếu hồ sơ</b><small>Cần bổ sung tài liệu được phép lưu trữ</small></div><strong>→</strong></button><button onClick={() => { setExpiryFilter("expired"); setActiveView("suppliers"); }}><span className="attention-icon danger">×</span><div><b>{stats.expired} hồ sơ đã hết hạn</b><small>Kiểm tra và cập nhật hồ sơ thay thế</small></div><strong>→</strong></button><button onClick={() => { setExpiryFilter("warning"); setActiveView("suppliers"); }}><span className="attention-icon warning">◷</span><div><b>{stats.warning} hồ sơ sắp hết hạn</b><small>Trong khoảng cảnh báo 90 ngày</small></div><strong>→</strong></button><button onClick={() => setActiveView("warnings")}><span className="attention-icon critical">⚠</span><div><b>{warningStats.conflicts} mã số thuế/tên trùng lặp</b><small>Đối chiếu để loại trừ lỗi ánh xạ dữ liệu</small></div><strong>→</strong></button></div></article>
+        <section className={`overview-detail admin-view ${activeView === "overview" ? "" : "is-hidden"}`} aria-label="Chi tiết tổng quan">
+          <article className="panel system-health">
+            <div className="panel-head"><div><p className="panel-kicker">DỮ LIỆU QUẢN TRỊ</p><h2>Phạm vi dữ liệu hiện có</h2></div><span className="health-online">Ảnh chụp hiện tại</span></div>
+            <div className="health-list">
+              <div><span>Nhà cung cấp đang hoạt động</span><b>{stats.active}/{stats.total}</b></div>
+              <div><span>Nhà cung cấp đã xác minh</span><b>{stats.verified}/{stats.total}</b></div>
+              <div><span>Hồ sơ được công khai</span><b>{stats.publicDocs}/{docs.length}</b></div>
+              <div><span>Cảnh báo cần rà soát</span><b>{warnings.length}</b></div>
+            </div>
+          </article>
+          <article className="panel attention-panel">
+            <div className="panel-head"><div><p className="panel-kicker">CẦN CHÚ Ý</p><h2>Ưu tiên xử lý</h2></div></div>
+            <div className="attention-list">
+              <button type="button" onClick={() => { setExpiryFilter("missing"); setActiveView("suppliers"); }} title="Xem nhà cung cấp thiếu hồ sơ"><span className="attention-icon critical" aria-hidden="true">!</span><div><b>{stats.missing} nhà cung cấp thiếu hồ sơ</b><small>Cần bổ sung tài liệu được phép lưu trữ</small></div><strong aria-hidden="true">→</strong></button>
+              <button type="button" onClick={() => { setExpiryFilter("expired"); setActiveView("suppliers"); }} title="Xem hồ sơ đã hết hạn"><span className="attention-icon danger" aria-hidden="true">×</span><div><b>{stats.expired} hồ sơ đã hết hạn</b><small>Kiểm tra và cập nhật hồ sơ thay thế</small></div><strong aria-hidden="true">→</strong></button>
+              <button type="button" onClick={() => { setExpiryFilter("warning"); setActiveView("suppliers"); }} title="Xem hồ sơ sắp hết hạn"><span className="attention-icon warning" aria-hidden="true">◷</span><div><b>{stats.warning} hồ sơ sắp hết hạn</b><small>Trong khoảng cảnh báo 90 ngày</small></div><strong aria-hidden="true">→</strong></button>
+              <button type="button" onClick={() => setActiveView("warnings")} title="Mở danh sách cảnh báo trùng dữ liệu"><span className="attention-icon critical" aria-hidden="true">⚠</span><div><b>{warningStats.conflicts} mã số thuế/tên trùng lặp</b><small>Đối chiếu để loại trừ lỗi ánh xạ dữ liệu</small></div><strong aria-hidden="true">→</strong></button>
+            </div>
+          </article>
         </section>
         <section className={`panel admin-view ${activeView === "warnings" ? "" : "is-hidden"}`} id="warnings">
           <div className="panel-head">
@@ -513,15 +563,15 @@ export default function AdminDashboard({
           </div>
           <div className="warning-list">
             {warnings.map((warning, index) => (
-              <button key={`${warning.code}-${warning.rule}-${index}`} className={`warning-row ${warning.severity}`} onClick={() => openWarning(warning)}>
-                <span className={`attention-icon ${warning.severity === "critical" ? "danger" : warning.severity === "warning" ? "warning" : "neutral"}`}>
+              <button type="button" key={`${warning.code}-${warning.rule}-${index}`} className={`warning-row ${warning.severity}`} onClick={() => openWarning(warning)} title={`Mở hồ sơ ${warning.code} để xử lý cảnh báo`}>
+                <span aria-hidden="true" className={`attention-icon ${warning.severity === "critical" ? "danger" : warning.severity === "warning" ? "warning" : "neutral"}`}>
                   {warning.severity === "critical" ? "!" : warning.severity === "warning" ? "◷" : "i"}
                 </span>
                 <div>
                   <b>{warning.code} · {severityLabels[warning.severity]}</b>
                   <small>{warning.message}</small>
                 </div>
-                <strong>→</strong>
+                <strong aria-hidden="true">→</strong>
               </button>
             ))}
             {!warnings.length && <p className="empty">Không có cảnh báo dữ liệu nào theo quy tắc hiện có.</p>}
@@ -530,7 +580,7 @@ export default function AdminDashboard({
         <section className={`panel admin-view ${activeView === "suppliers" ? "" : "is-hidden"}`} id="suppliers">
           <div className="panel-head">
             <div>
-              <p className="panel-kicker">DANH SÁCH</p><h2>Nhà cung cấp</h2>
+              <p className="panel-kicker">DANH SÁCH</p><h2>Danh sách nhà cung cấp</h2>
               <p>
                 {filtered.length} kết quả · Bộ lọc:{" "}
                 {expiryFilter === "all" ? "tất cả" : expiryFilter}
@@ -540,10 +590,12 @@ export default function AdminDashboard({
               <input
                 className="search"
                 placeholder="Tìm mã, tên, sản phẩm…"
+                aria-label="Tìm nhà cung cấp theo mã, tên hoặc sản phẩm"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
               <select
+                aria-label="Lọc theo loại hồ sơ"
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
               >
@@ -555,11 +607,13 @@ export default function AdminDashboard({
                 ))}
               </select>
               <button
+                type="button"
                 onClick={() => {
                   setQuery("");
                   setExpiryFilter("all");
                   setCategoryFilter("all");
                 }}
+                title="Xóa toàn bộ bộ lọc nhà cung cấp"
               >
                 Xóa lọc
               </button>
@@ -594,8 +648,10 @@ export default function AdminDashboard({
                     </td>
                     <td data-label="Hồ sơ">
                       <button
+                        type="button"
                         className="link-btn"
                         onClick={() => openDocuments(s)}
+                        title={`Quản lý hồ sơ của ${s.code}`}
                       >
                         {s.documents.length} hồ sơ
                       </button>
@@ -606,15 +662,18 @@ export default function AdminDashboard({
                       </span>
                     </td>
                     <td className="actions" data-label="Thao tác">
-                      <a href={`/qr/${s.code}`} target="_blank">
-                        Xem
+                      <a href={`/qr/${s.code}`} target="_blank" rel="noopener noreferrer" title={`Mở trang truy xuất công khai của ${s.code}`}>
+                        Xem trang
                       </a>
-                      <button onClick={() => editSupplier(s)}>Sửa</button>
+                      <button type="button" onClick={() => editSupplier(s)} title={`Chỉnh sửa thông tin ${s.code}`}>Chỉnh sửa</button>
                       <button
+                        type="button"
                         className="danger-link"
                         onClick={() => archiveSupplier(s)}
+                        disabled={s.status !== "ACTIVE"}
+                        title={s.status === "ACTIVE" ? `Tạm ngừng ${s.code} nhưng vẫn giữ dữ liệu và URL QR` : `${s.code} hiện đã tạm ngừng`}
                       >
-                        Tạm ngừng
+                        {s.status === "ACTIVE" ? "Tạm ngừng" : "Đã tạm ngừng"}
                       </button>
                     </td>
                   </tr>
@@ -627,8 +686,26 @@ export default function AdminDashboard({
           </div>
         </section>
         <section className={`qr-workspace admin-view ${activeView === "qr" ? "" : "is-hidden"}`}>
-          <div className="module-toolbar"><div><p className="panel-kicker">MÃ TRUY XUẤT</p><h2>{suppliers.length} mã QR nhà cung cấp</h2><p>Mỗi QR được tạo tự động từ URL cố định của nhà cung cấp.</p></div><a className="primary-btn" href="/api/qr/bulk">Tải ZIP toàn bộ</a></div>
-          <div className="qr-gallery admin-qr-gallery">{suppliers.map(s=><article className="qr-gallery-card" key={s.code}><div className="qr-image-wrap"><img src={`/api/qr/${s.code}?format=png`} alt={`Mã QR ${s.code}`}/></div><div className="qr-card-copy"><div><b>{s.code}</b><span className={`status ${s.status.toLowerCase()}`}>{s.status==='ACTIVE'?'Hoạt động':'Tạm ngừng'}</span></div><h2>{s.productName||'Sản phẩm đang đối chiếu'}</h2><p>{s.name}</p><code>{`${(process.env.NEXT_PUBLIC_SITE_URL||"http://localhost:3000").replace(/\/$/,"")}/qr/${s.code}`}</code></div><div className="qr-card-actions"><a href={`/api/qr/${s.code}?format=png&download=1`}>PNG</a><a href={`/api/qr/${s.code}?format=svg&download=1`}>SVG</a><a href={`/admin/print/${s.code}`} target="_blank">In tem</a><a href={`/qr/${s.code}`} target="_blank">Mở trang</a></div></article>)}</div>
+          <div className="module-toolbar"><div><p className="panel-kicker">MÃ TRUY XUẤT</p><h2>{suppliers.length} mã QR nhà cung cấp</h2><p>Mỗi QR được tạo tự động từ URL cố định của nhà cung cấp.</p></div></div>
+          <div className="qr-gallery admin-qr-gallery">
+            {suppliers.map((supplier) => (
+              <article className="qr-gallery-card" key={supplier.code}>
+                <div className="qr-image-wrap"><img src={`/api/qr/${supplier.code}?format=png`} alt={`Mã QR truy xuất nhà cung cấp ${supplier.code}`} /></div>
+                <div className="qr-card-copy">
+                  <div><b>{supplier.code}</b><span className={`status ${supplier.status.toLowerCase()}`}>{supplier.status === "ACTIVE" ? "Hoạt động" : "Tạm ngừng"}</span></div>
+                  <h2>{supplier.productName || "Sản phẩm đang đối chiếu"}</h2>
+                  <p>{supplier.name}</p>
+                  <code>{`${(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "")}/qr/${supplier.code}`}</code>
+                </div>
+                <div className="qr-card-actions" aria-label={`Tác vụ mã QR ${supplier.code}`}>
+                  <a href={`/api/qr/${supplier.code}?format=png&download=1`} title={`Tải mã QR ${supplier.code} định dạng PNG`}>Tải PNG</a>
+                  <a href={`/api/qr/${supplier.code}?format=svg&download=1`} title={`Tải mã QR ${supplier.code} định dạng SVG`}>Tải SVG</a>
+                  <a href={`/admin/print/${supplier.code}`} target="_blank" rel="noopener noreferrer" title={`Mở mẫu in tem ${supplier.code}`}>In tem</a>
+                  <a href={`/qr/${supplier.code}`} target="_blank" rel="noopener noreferrer" title={`Mở trang truy xuất ${supplier.code}`}>Mở trang</a>
+                </div>
+              </article>
+            ))}
+          </div>
         </section>
         <section className={`panel audit-panel admin-view ${activeView === "audit" ? "" : "is-hidden"}`} id="audit">
           <div className="panel-head">
@@ -648,27 +725,29 @@ export default function AdminDashboard({
             <p className="empty">Chưa có hoạt động chỉnh sửa.</p>
           )}
         </section>
-        <section className={`admin-view ${activeView === "batches" ? "" : "is-hidden"}`}>
+        <section className={`admin-view ${activeView === "batches" ? "" : "is-hidden"}`} aria-label="Không gian quản lý lô nhập hàng">
           {activeView === "batches" && <TraceWorkspace />}
         </section>
-        <section className={`admin-view ${activeView === "settings" ? "" : "is-hidden"}`}>
-          <div className="admin-settings-tabs">
-            <button className={settingsTab === "account" ? "active" : ""} onClick={() => setSettingsTab("account")}>Tài khoản</button>
-            <button className={settingsTab === "ai" ? "active" : ""} onClick={() => setSettingsTab("ai")}>Cấu hình AI</button>
-            <button className={settingsTab === "hanoicheck" ? "active" : ""} onClick={() => setSettingsTab("hanoicheck")}>Kết nối HanoiCheck</button>
+        <section className={`admin-view ${activeView === "settings" ? "" : "is-hidden"}`} aria-label="Cài đặt hệ thống">
+          <div className="admin-settings-tabs" role="tablist" aria-label="Nhóm cài đặt">
+            <button id="settings-tab-account" aria-controls="settings-panel-account" type="button" role="tab" aria-selected={settingsTab === "account"} className={settingsTab === "account" ? "active" : ""} onClick={() => setSettingsTab("account")}>Tài khoản</button>
+            <button id="settings-tab-ai" aria-controls="settings-panel-ai" type="button" role="tab" aria-selected={settingsTab === "ai"} className={settingsTab === "ai" ? "active" : ""} onClick={() => setSettingsTab("ai")}>Cấu hình AI</button>
+            <button id="settings-tab-hanoicheck" aria-controls="settings-panel-hanoicheck" type="button" role="tab" aria-selected={settingsTab === "hanoicheck"} className={settingsTab === "hanoicheck" ? "active" : ""} onClick={() => setSettingsTab("hanoicheck")}>Kết nối HanoiCheck</button>
           </div>
-          {settingsTab === "account" && <AccountSettingsForm username={adminUsername} />}
-          {settingsTab === "ai" && <AiSettingsForm />}
-          {settingsTab === "hanoicheck" && <HanoiCheckSettingsForm />}
+          <div id={`settings-panel-${settingsTab}`} role="tabpanel" aria-labelledby={`settings-tab-${settingsTab}`} tabIndex={0}>
+            {settingsTab === "account" && <AccountSettingsForm username={adminUsername} />}
+            {settingsTab === "ai" && <AiSettingsForm />}
+            {settingsTab === "hanoicheck" && <HanoiCheckSettingsForm />}
+          </div>
         </section>
       </section>
 
       {showSupplierForm && (
         <div className="modal-backdrop">
-          <form className="modal" onSubmit={saveSupplier}>
+          <form className="modal" onSubmit={saveSupplier} role="dialog" aria-modal="true" aria-labelledby="supplier-dialog-title">
             <div className="modal-head">
-              <h2>{selected ? "Sửa nhà cung cấp" : "Thêm nhà cung cấp"}</h2>
-              <button type="button" onClick={() => setShowSupplierForm(false)}>
+              <h2 id="supplier-dialog-title">{selected ? "Chỉnh sửa nhà cung cấp" : "Thêm nhà cung cấp"}</h2>
+              <button type="button" onClick={() => setShowSupplierForm(false)} aria-label="Đóng biểu mẫu nhà cung cấp" title="Đóng">
                 ×
               </button>
             </div>
@@ -679,28 +758,36 @@ export default function AdminDashboard({
                 ["productName", "Nhóm sản phẩm"],
                 ["taxCode", "Mã số thuế"],
                 ["address", "Địa chỉ"],
+                ["phone", "Hotline"],
+                ["website", "Website"],
+                ["email", "Email"],
+                ["description", "Giới thiệu công ty"],
                 ["storage", "Bảo quản"],
                 ["shelfLife", "Hạn sử dụng"],
                 ["notes", "Ghi chú"],
               ].map(([key, label]) => (
                 <label
                   className={
-                    ["name", "address", "notes"].includes(key) ? "wide" : ""
+                    ["name", "address", "description", "notes"].includes(key) ? "wide" : ""
                   }
                   key={key}
                 >
                   {label}
-                  <input
-                    value={supplierForm[key] || ""}
-                    disabled={Boolean(selected) && key === "code"}
-                    onChange={(e) =>
-                      setSupplierForm({
-                        ...supplierForm,
-                        [key]: e.target.value,
-                      })
-                    }
-                    required={key === "code" || key === "name"}
-                  />
+                  {key === "description"
+                    ? <textarea rows={3} value={supplierForm[key] || ""} onChange={(e) => setSupplierForm({ ...supplierForm, [key]: e.target.value })} />
+                    : <input
+                        type={key === "email" ? "email" : key === "phone" ? "tel" : "text"}
+                        autoComplete={key === "email" ? "email" : key === "phone" ? "tel" : key === "website" ? "url" : "off"}
+                        value={supplierForm[key] || ""}
+                        disabled={Boolean(selected) && key === "code"}
+                        onChange={(e) =>
+                          setSupplierForm({
+                            ...supplierForm,
+                            [key]: e.target.value,
+                          })
+                        }
+                        required={key === "code" || key === "name"}
+                      />}
                 </label>
               ))}
               <div className="form-section-title wide"><span>EN</span><div><b>Nội dung tiếng Anh</b><small>Chỉ nhập bản dịch đã được kiểm tra</small></div></div>
@@ -709,10 +796,11 @@ export default function AdminDashboard({
                 ["nameEn", "Supplier name (English)"],
                 ["productNameEn", "Product group (English)"],
                 ["addressEn", "Address (English)"],
+                ["descriptionEn", "Company intro (English)"],
                 ["storageEn", "Storage conditions (English)"],
                 ["shelfLifeEn", "Shelf life (English)"],
                 ["notesEn", "Public notes (English)"],
-              ].map(([key,label])=><label className={["nameEn","addressEn","notesEn"].includes(key)?"wide":""} key={key}>{label}<input value={supplierForm[key]||""} onChange={e=>setSupplierForm({...supplierForm,[key]:e.target.value})}/></label>)}
+              ].map(([key,label])=><label className={["nameEn","addressEn","descriptionEn","notesEn"].includes(key)?"wide":""} key={key}>{label}{key==="descriptionEn"?<textarea rows={3} value={supplierForm[key]||""} onChange={e=>setSupplierForm({...supplierForm,[key]:e.target.value})}/>:<input value={supplierForm[key]||""} onChange={e=>setSupplierForm({...supplierForm,[key]:e.target.value})}/>}</label>)}
               <label>
                 Trạng thái
                 <select
@@ -742,13 +830,13 @@ export default function AdminDashboard({
                 </select>
               </label>
             </div>
-            {message && <p className="form-error">{message}</p>}
+            {message && <p className="form-error" role="alert">{message}</p>}
             <div className="modal-actions">
-              <button type="button" onClick={() => setShowSupplierForm(false)}>
+              <button type="button" onClick={() => setShowSupplierForm(false)} title="Hủy và đóng biểu mẫu">
                 Hủy
               </button>
-              <button className="primary-btn" disabled={busy}>
-                {busy ? "Đang lưu…" : "Lưu thay đổi"}
+              <button type="submit" className="primary-btn" disabled={busy}>
+                {busy ? "Đang lưu…" : selected ? "Lưu thay đổi" : "Thêm nhà cung cấp"}
               </button>
             </div>
           </form>
@@ -757,13 +845,13 @@ export default function AdminDashboard({
 
       {selected && !showSupplierForm && (
         <div className="modal-backdrop">
-          <div className="modal document-modal">
+          <div className="modal document-modal" role="dialog" aria-modal="true" aria-labelledby="documents-dialog-title">
             <div className="modal-head">
               <div>
-                <h2>Hồ sơ {selected.code}</h2>
+                <h2 id="documents-dialog-title">Hồ sơ nhà cung cấp {selected.code}</h2>
                 <p>{selected.name}</p>
               </div>
-              <button onClick={() => setSelected(null)}>×</button>
+              <button type="button" onClick={() => setSelected(null)} aria-label="Đóng quản lý hồ sơ" title="Đóng">×</button>
             </div>
             <div className="document-toolbar">
               <span>
@@ -771,6 +859,7 @@ export default function AdminDashboard({
                 {selected.documents.filter((d) => d.isPublic).length} công khai
               </span>
               <button
+                type="button"
                 className="primary-btn"
                 onClick={() => {
                   setEditingDocument(null);
@@ -778,18 +867,19 @@ export default function AdminDashboard({
                   setAiSuggestion(null);
                   setShowDocumentForm(true);
                 }}
+                title={`Thêm hồ sơ cho ${selected.code}`}
               >
                 + Thêm hồ sơ
               </button>
             </div>
-            {message && <div className="notice">{message}</div>}
+            {message && <div className="notice" role="status" aria-live="polite">{message}</div>}
             <div className="document-list">
               {selected.documents.map((d) => {
                 const state = expiry(d.expiresAt);
                 return (
                   <div className="document-admin" key={d.id}>
                     <div className="document-main">
-                      <span className="file-icon">▤</span>
+                      <span className="file-icon" aria-hidden="true">▤</span>
                       <div>
                         <b>{d.title}</b>
                         <span>
@@ -809,6 +899,7 @@ export default function AdminDashboard({
                               <a
                                 href={version.fileUrl}
                                 target="_blank"
+                                rel="noopener noreferrer"
                                 key={version.id}
                               >
                                 {new Date(version.createdAt).toLocaleString(
@@ -821,25 +912,29 @@ export default function AdminDashboard({
                       </div>
                     </div>
                     <div className="document-actions">
-                      <button onClick={() => setPreviewUrl(d.fileUrl)}>
+                      <button type="button" onClick={() => setPreviewUrl(d.fileUrl)} title={`Xem trước ${d.title}`}>
                         Xem trước
                       </button>
-                      <a href={d.fileUrl} target="_blank">
-                        Mở
+                      <a href={d.fileUrl} target="_blank" rel="noopener noreferrer" title={`Mở tệp ${d.title} trong cửa sổ mới`}>
+                        Mở tệp
                       </a>
                       <button
+                        type="button"
                         onClick={() => {
                           setEditingDocument(d);
                           setDocFields({ title: d.title, category: d.category, issuedAt: d.issuedAt?.slice(0, 10) || "", expiresAt: d.expiresAt?.slice(0, 10) || "" });
                           setAiSuggestion(null);
                           setShowDocumentForm(true);
                         }}
+                        title={`Chỉnh sửa ${d.title}`}
                       >
-                        Sửa
+                        Chỉnh sửa
                       </button>
                       <button
+                        type="button"
                         className="danger-link"
                         onClick={() => removeDocument(d)}
+                        title={`Xóa hồ sơ ${d.title}`}
                       >
                         Xóa
                       </button>
@@ -866,6 +961,7 @@ export default function AdminDashboard({
                   <button
                     type="button"
                     onClick={() => setShowDocumentForm(false)}
+                    title="Đóng biểu mẫu hồ sơ"
                   >
                     Đóng
                   </button>
@@ -980,7 +1076,7 @@ export default function AdminDashboard({
                   Chỉ bật công khai khi Sunfood đã xác nhận quyền lưu trữ và
                   công bố tài liệu.
                 </p>
-                <button className="primary-btn" disabled={busy}>
+                <button type="submit" className="primary-btn" disabled={busy}>
                   {busy
                     ? "Đang lưu…"
                     : editingDocument
@@ -997,12 +1093,14 @@ export default function AdminDashboard({
                 <a
                   className="secondary-btn"
                   href={`/api/qr/${selected.code}?format=png&download=1`}
+                  title={`Tải mã QR ${selected.code} định dạng PNG`}
                 >
                   Tải PNG
                 </a>
                 <a
                   className="secondary-btn"
                   href={`/api/qr/${selected.code}?format=svg&download=1`}
+                  title={`Tải mã QR ${selected.code} định dạng SVG`}
                 >
                   Tải SVG
                 </a>
@@ -1010,6 +1108,8 @@ export default function AdminDashboard({
                   className="secondary-btn"
                   href={`/admin/print/${selected.code}`}
                   target="_blank"
+                  rel="noopener noreferrer"
+                  title={`Mở mẫu in tem ${selected.code}`}
                 >
                   In tem A6/A5
                 </a>
@@ -1020,17 +1120,17 @@ export default function AdminDashboard({
       )}
       {previewUrl && (
         <div className="modal-backdrop preview-backdrop">
-          <div className="modal preview-modal">
+          <div className="modal preview-modal" role="dialog" aria-modal="true" aria-labelledby="preview-dialog-title">
             <div className="modal-head">
-              <h2>Xem trước hồ sơ</h2>
-              <button onClick={() => setPreviewUrl(null)}>×</button>
+              <h2 id="preview-dialog-title">Xem trước hồ sơ</h2>
+              <button type="button" onClick={() => setPreviewUrl(null)} aria-label="Đóng cửa sổ xem trước" title="Đóng">×</button>
             </div>
             {/\.pdf(?:\?|$)/i.test(previewUrl) ? (
               <iframe src={previewUrl} title="Xem trước PDF" />
             ) : (
               <img src={previewUrl} alt="Xem trước hồ sơ" />
             )}
-            <a className="secondary-btn" href={previewUrl} target="_blank">
+            <a className="secondary-btn" href={previewUrl} target="_blank" rel="noopener noreferrer" title="Mở tệp trong cửa sổ mới">
               Mở trong cửa sổ mới
             </a>
           </div>

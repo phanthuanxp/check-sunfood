@@ -16,10 +16,10 @@ function parseHanoiCheckPayload(sourceSystem: string, payload: string | null): H
 export const dynamic = 'force-dynamic';
 
 const format = (date: Date | null) => date
-  ? new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date)
+  ? new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' }).format(date)
   : 'Chưa có dữ liệu đã xác minh';
 const formatDateTime = (date: Date | null) => date
-  ? `${format(date)} ${new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit' }).format(date)}`
+  ? `${format(date)} ${new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' }).format(date)}`
   : '';
 
 function expiryStatus(expiresAt: Date | null, now: Date) {
@@ -85,8 +85,10 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
   const expiry = expiryStatus(batch.expiresAt, new Date());
   const shelfDays = shelfLifeDays(batch.producedAt, batch.expiresAt);
   const steps = sourceDetail?.steps ?? [];
+  const displayName = batch.name || product.name;
 
   const infoRows = [
+    ['Ngày nhập hàng', format(batch.receivedAt)],
     ['Ngày sản xuất', format(batch.producedAt)],
     shelfDays != null ? ['Hạn sử dụng', `${shelfDays} ngày`] : null,
     ['Ngày hết hạn', format(batch.expiresAt)],
@@ -111,7 +113,7 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
       <section className="trace-hero lot-hero-has-qr"><div className="hero-glow" /><div className="hero-content">
         <LotQrThumbnail publicId={batch.publicId} batchCode={batch.code} />
         <span className="lot-hero-badge">✓ {batch.sourceSystem === 'HANOICHECK' ? 'Đã xác minh & đồng bộ HanoiCheck' : 'Hồ sơ lô đã công bố'}</span>
-        <h1><span className="lot-hero-title-icon" aria-hidden="true">{productIcon(product.name)}</span>{product.name}</h1>
+        <h1><span className="lot-hero-title-icon" aria-hidden="true">{productIcon(displayName)}</span>{displayName}</h1>
         <div className="lot-hero-codes"><div className="code-pill">Mã NCC <b>{product.supplier.code}</b></div><div className="code-pill">Mã lô <b>{batch.code}</b></div></div>
       </div></section>
       <div className="trace-container lot-container">

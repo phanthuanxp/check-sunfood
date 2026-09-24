@@ -28,6 +28,7 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:temporary-lots": "tsx scripts/create-temporary-lots.ts",
     "import:smartcheck": "node scripts/import-smartcheck.mjs"
   },
   "dependencies": {
