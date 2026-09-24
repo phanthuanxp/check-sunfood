@@ -46,16 +46,18 @@ const toInputValue = (iso: string | null) => {
 };
 const todayInputValue = () => toInputValue(new Date().toISOString());
 
-type BatchListItem = { id: number; code: string; product: { id: number } };
-async function findDuplicateBatchCode(code: string, productId: number, excludeId?: number) {
+type BatchListItem = { id: number; code: string };
+// Batch.code is globally unique (it doubles as the short public lot URL), so this checks across
+// every product/supplier, not just the one currently selected.
+async function findDuplicateBatchCode(code: string, excludeId?: number) {
   const trimmed = code.trim();
-  if (!trimmed || !productId) return '';
+  if (!trimmed) return '';
   try {
     const response = await fetch(`/api/admin/trace/batches?q=${encodeURIComponent(trimmed)}&pageSize=20`, { cache: 'no-store' });
     const data = await response.json();
     if (!response.ok) return '';
-    const match = (data.items as BatchListItem[]).find(item => item.product.id === productId && item.code.toLowerCase() === trimmed.toLowerCase() && item.id !== excludeId);
-    return match ? 'Mã lô này đã tồn tại cho sản phẩm này — vui lòng đổi mã khác.' : '';
+    const match = (data.items as BatchListItem[]).find(item => item.code.toLowerCase() === trimmed.toLowerCase() && item.id !== excludeId);
+    return match ? 'Mã lô này đã tồn tại — vui lòng đổi mã khác.' : '';
   } catch { return ''; }
 }
 
@@ -124,16 +126,16 @@ export default function BatchesTable() {
 
   useEffect(() => {
     const timer = setTimeout(async () => {
-      if (createMode !== 'existing' || !createProductId || !createCode.trim()) { setCreateCodeWarning(''); return; }
-      setCreateCodeWarning(await findDuplicateBatchCode(createCode, Number(createProductId)));
+      if (!createCode.trim()) { setCreateCodeWarning(''); return; }
+      setCreateCodeWarning(await findDuplicateBatchCode(createCode));
     }, 400);
     return () => clearTimeout(timer);
-  }, [createCode, createProductId, createMode]);
+  }, [createCode]);
 
   useEffect(() => {
     const timer = setTimeout(async () => {
       if (!drawerBatch || !editCode.trim() || editCode === drawerBatch.code) { setEditCodeWarning(''); return; }
-      setEditCodeWarning(await findDuplicateBatchCode(editCode, drawerBatch.product.id, drawerBatch.id));
+      setEditCodeWarning(await findDuplicateBatchCode(editCode, drawerBatch.id));
     }, 400);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -381,7 +383,7 @@ export default function BatchesTable() {
           <label>Ngày nhập hàng <input name="receivedAt" type="date" defaultValue={todayInputValue()} /></label>
           <label>Ngày sản xuất <input name="producedAt" type="date" /></label>
           <label>Hạn dùng <input name="expiresAt" type="date" /></label>
-          <div className="trace-row-actions wide"><button className="primary-btn" disabled={busy || (createMode === 'existing' && Boolean(createCodeWarning))}>Tạo lô nháp</button><button className="secondary-btn" type="button" onClick={closeCreate}>Hủy</button></div>
+          <div className="trace-row-actions wide"><button className="primary-btn" disabled={busy || Boolean(createCodeWarning)}>Tạo lô nháp</button><button className="secondary-btn" type="button" onClick={closeCreate}>Hủy</button></div>
         </form>
       </div>
     </div>}
@@ -425,7 +427,7 @@ export default function BatchesTable() {
               </div>
             </td>
             <td className="actions trace-row-btns" data-label="Thao tác">
-              {(batch.isPublic || batch.everPublished) && <a className="trace-circle-btn" title="Xem trang công khai" href={`/lot/${batch.publicId}`} target="_blank">↗</a>}
+              {(batch.isPublic || batch.everPublished) && <a className="trace-circle-btn" title="Xem trang công khai" href={`/lot/${encodeURIComponent(batch.code)}`} target="_blank">↗</a>}
               <button className="trace-circle-btn" title="Sửa lô" onClick={() => openDrawer(batch.id)}>✎</button>
               <button className={`trace-circle-btn ${batch.isPublic ? 'trace-circle-btn-hide' : 'trace-circle-btn-approve'}`} title={batch.isPublic ? 'Ẩn lô khỏi trang công khai' : 'Duyệt công khai lô này'} disabled={busy} onClick={() => toggleOne(batch.id, !batch.isPublic)}>{batch.isPublic ? '⊘' : '✓'}</button>
             </td>
@@ -505,10 +507,10 @@ export default function BatchesTable() {
           </div>
           {drawerBatch.sourceTraceUrl && <p><a href={drawerBatch.sourceTraceUrl} target="_blank" rel="noreferrer">Xem trên HanoiCheck ↗</a></p>}
           {(drawerBatch.isPublic || drawerBatch.everPublished) && <div className="trace-qr-links">
-            <a href={`/lot/${drawerBatch.publicId}`} target="_blank">Trang truy xuất</a>
-            <a href={`/api/qr/lot/${drawerBatch.publicId}?format=png&download=1`}>QR PNG</a>
-            <a href={`/api/qr/lot/${drawerBatch.publicId}?format=svg&download=1`}>QR SVG</a>
-            <a href={`/admin/print/lot/${drawerBatch.publicId}`} target="_blank">In tem A6/A5</a>
+            <a href={`/lot/${encodeURIComponent(drawerBatch.code)}`} target="_blank">Trang truy xuất</a>
+            <a href={`/api/qr/lot/${encodeURIComponent(drawerBatch.code)}?format=png&download=1`}>QR PNG</a>
+            <a href={`/api/qr/lot/${encodeURIComponent(drawerBatch.code)}?format=svg&download=1`}>QR SVG</a>
+            <a href={`/admin/print/lot/${encodeURIComponent(drawerBatch.code)}`} target="_blank">In tem A6/A5</a>
           </div>}
 
           <div className="document-form">

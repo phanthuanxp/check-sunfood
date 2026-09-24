@@ -149,7 +149,7 @@ model Batch {
   id         Int          @id @default(autoincrement())
   publicId   String       @unique @default(cuid())
   productId  Int
-  code       String
+  code       String       @unique
   name       String?
   receivedAt DateTime?
   producedAt DateTime?

@@ -1,8 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { prisma } from '@/lib/prisma';
-import { isBatchAvailable } from '@/lib/trace-publish';
+import { isBatchAvailable, findBatchByLotIdentifier } from '@/lib/trace-publish';
 import type { HcTraceDetail } from '@/lib/hanoicheck-trace';
 import LotQrThumbnail from './LotQrThumbnail';
 import './lot.css';
@@ -71,12 +70,8 @@ function productIcon(name: string) {
 }
 
 export default async function LotPage({ params }: { params: Promise<{ id: string }> }) {
-  const publicId = (await params).id;
-  if (!/^c[a-z0-9]{20,40}$/.test(publicId)) notFound();
-  const batch = await prisma.batch.findUnique({
-    where: { publicId },
-    include: { product: { include: { supplier: true } } },
-  });
+  const identifier = (await params).id;
+  const batch = await findBatchByLotIdentifier(identifier);
   if (!batch || (!batch.isPublic && !batch.everPublished)) notFound();
 
   const { product } = batch;
@@ -111,7 +106,7 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
       <div className="code-pill">Mã lô <b>{batch.code}</b></div>
     </div></section> : <>
       <section className="trace-hero lot-hero-has-qr"><div className="hero-glow" /><div className="hero-content">
-        <LotQrThumbnail publicId={batch.publicId} batchCode={batch.code} />
+        <LotQrThumbnail batchCode={batch.code} />
         <span className="lot-hero-badge">✓ {batch.sourceSystem === 'HANOICHECK' ? 'Đã xác minh & đồng bộ HanoiCheck' : 'Hồ sơ lô đã công bố'}</span>
         <h1><span className="lot-hero-title-icon" aria-hidden="true">{productIcon(displayName)}</span>{displayName}</h1>
         <div className="lot-hero-codes"><div className="code-pill">Mã NCC <b>{product.supplier.code}</b></div><div className="code-pill">Mã lô <b>{batch.code}</b></div></div>
