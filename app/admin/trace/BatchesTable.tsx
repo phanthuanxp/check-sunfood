@@ -1,5 +1,6 @@
 'use client';
 import { FormEvent, useEffect, useRef, useState } from 'react';
+import { waitForHanoiCheckJob } from '@/lib/hanoicheck-job-client';
 
 type BatchRow = {
   id: number; publicId: string; code: string; name: string | null;
@@ -195,9 +196,9 @@ export default function BatchesTable() {
     try {
       const today = new Date().toISOString().slice(0, 10);
       const response = await fetch('/api/admin/hanoicheck/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dateFrom: today, dateTo: today }) });
-      const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Không đồng bộ được.');
+      const result = await waitForHanoiCheckJob(response, status => notify(status === 'RUNNING' ? 'Đang đọc dữ liệu HanoiCheck…' : 'Lượt đồng bộ đang chờ xử lý…'));
       setPage(1); await refresh();
-      notify(`Đã đọc ${result.processed} lô hôm nay: ${result.created} mới, ${result.updated} cập nhật, ${result.skipped.length} bỏ qua.${result.skipped.length ? ' ' + result.skipped.slice(0, 3).map((s: { code: string; reason: string }) => `${s.code}: ${s.reason}`).join(' | ') : ''}`);
+      notify(`Đã đọc ${result.processed} lô hôm nay: ${result.created} lô nháp mới, ${result.pending} bản chờ đối chiếu, ${result.unchanged} không đổi, ${result.skipped.length} bỏ qua.${result.skipped.length ? ' ' + result.skipped.slice(0, 3).map(s => `${s.code}: ${s.reason}`).join(' | ') : ''}`);
     } catch (error) { notify(error instanceof Error ? error.message : 'Không đồng bộ được.', 'error'); }
     finally { setSyncing(false); }
   }

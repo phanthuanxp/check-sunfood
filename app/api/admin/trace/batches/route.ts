@@ -11,6 +11,15 @@ function batchStatus(isPublic: boolean, everPublished: boolean) {
   return 'DRAFT';
 }
 
+function vietnamDayStart(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]), month = Number(match[2]), day = Number(match[3]);
+  const check = new Date(Date.UTC(year, month - 1, day));
+  if (year < 1900 || year > 2200 || check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) return null;
+  return new Date(check.getTime() - 7 * 60 * 60 * 1000);
+}
+
 export async function GET(request: Request) {
   if (!(await isAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const { searchParams } = new URL(request.url);
@@ -30,8 +39,12 @@ export async function GET(request: Request) {
   if (status === 'draft') and.push({ isPublic: false, everPublished: false });
   else if (status === 'public') and.push({ isPublic: true });
   else if (status === 'hidden') and.push({ isPublic: false, everPublished: true });
-  if (dateFrom) and.push({ receivedAt: { gte: new Date(`${dateFrom}T00:00:00.000Z`) } });
-  if (dateTo) and.push({ receivedAt: { lte: new Date(`${dateTo}T23:59:59.999Z`) } });
+  const from = dateFrom ? vietnamDayStart(dateFrom) : null;
+  const to = dateTo ? vietnamDayStart(dateTo) : null;
+  if ((dateFrom && !from) || (dateTo && !to) || (from && to && to < from))
+    return NextResponse.json({ error: 'Khoảng ngày không hợp lệ.' }, { status: 400 });
+  if (from) and.push({ receivedAt: { gte: from } });
+  if (to) and.push({ receivedAt: { lt: new Date(to.getTime() + 24 * 60 * 60 * 1000) } });
 
   const where: Prisma.BatchWhereInput = and.length ? { AND: and } : {};
 

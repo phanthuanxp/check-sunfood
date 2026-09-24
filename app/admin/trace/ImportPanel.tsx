@@ -1,5 +1,6 @@
 'use client';
 import { FormEvent, useState } from 'react';
+import { waitForHanoiCheckJob } from '@/lib/hanoicheck-job-client';
 
 export default function ImportPanel({ onImported }: { onImported: () => void }) {
   const [message, setMessage] = useState('');
@@ -19,9 +20,9 @@ export default function ImportPanel({ onImported }: { onImported: () => void }) 
     try {
       const payload = new FormData(); payload.set('file', file);
       const response = await fetch('/api/admin/hanoicheck/import-excel', { method: 'POST', body: payload });
-      const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Không nhập được file.');
-      if (result.created + result.updated > 0) onImported();
-      setMessage(`Đã đọc ${result.processed} dòng: ${result.created} lô mới, ${result.updated} cập nhật, ${result.skipped.length} bỏ qua.${result.skipped.length ? ' ' + result.skipped.slice(0, 5).map((s: { code: string; reason: string }) => `${s.code}: ${s.reason}`).join(' | ') : ''}`);
+      const result = await waitForHanoiCheckJob(response, status => setMessage(status === 'RUNNING' ? 'Đang đọc và lưu bản nguồn để đối chiếu…' : 'Lượt nhập đang chờ worker xử lý…'));
+      if (result.created + result.pending > 0) onImported();
+      setMessage(`Đã đọc ${result.processed} dòng: ${result.created} lô nháp mới, ${result.pending} bản chờ đối chiếu, ${result.unchanged} không đổi, ${result.skipped.length} bỏ qua.${result.skipped.length ? ' ' + result.skipped.slice(0, 5).map(s => `${s.code}: ${s.reason}`).join(' | ') : ''}`);
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Không nhập được file.'); }
     finally { setBusy(false); form.reset(); }
   }
@@ -31,7 +32,7 @@ export default function ImportPanel({ onImported }: { onImported: () => void }) 
     try {
       const response = await fetch('/api/admin/hanoicheck/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ traceUrl }) });
       const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Không nhập được lô.');
-      setTraceUrl(''); onImported(); setMessage(`Đã nhập lô ${result.batchCode}.`);
+      setTraceUrl(''); onImported(); setMessage(`Đã tiếp nhận lô ${result.batchCode} (${result.action === 'unchanged' ? 'không thay đổi' : 'chờ quản trị viên đối chiếu'}).`);
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Không nhập được lô.'); }
     finally { setBusy(false); }
   }
@@ -40,9 +41,9 @@ export default function ImportPanel({ onImported }: { onImported: () => void }) 
     setBusy(true); setMessage(`Đang đọc đơn hàng từ ${syncDateFrom} đến ${syncDateTo} trên HanoiCheck…`);
     try {
       const response = await fetch('/api/admin/hanoicheck/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dateFrom: syncDateFrom, dateTo: syncDateTo }) });
-      const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Không đồng bộ được.');
-      if (result.created + result.updated > 0) onImported();
-      setMessage(`Đã đọc ${result.processed} lô: ${result.created} mới, ${result.updated} cập nhật, ${result.skipped.length} bỏ qua.${result.skipped.length ? ' ' + result.skipped.slice(0, 3).map((s: { code: string; reason: string }) => `${s.code}: ${s.reason}`).join(' | ') : ''}`);
+      const result = await waitForHanoiCheckJob(response, status => setMessage(status === 'RUNNING' ? 'Đang đọc đơn hàng và lưu bản nguồn để đối chiếu…' : 'Lượt đồng bộ đang chờ worker xử lý…'));
+      if (result.created + result.pending > 0) onImported();
+      setMessage(`Đã đọc ${result.processed} lô: ${result.created} lô nháp mới, ${result.pending} bản chờ đối chiếu, ${result.unchanged} không đổi, ${result.skipped.length} bỏ qua.${result.skipped.length ? ' ' + result.skipped.slice(0, 3).map(s => `${s.code}: ${s.reason}`).join(' | ') : ''}`);
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Không đồng bộ được.'); }
     finally { setBusy(false); }
   }

@@ -140,6 +140,26 @@ export function extractHanoiCheckTrace(html: string): HcTraceDetail {
   };
 }
 
+async function readBoundedHtml(response: Response, maxBytes: number) {
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('Trang truy xuất HanoiCheck không có nội dung.');
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      length += value.byteLength;
+      if (length > maxBytes) throw new Error('Trang truy xuất vượt giới hạn 3 MB.');
+      chunks.push(value);
+    }
+    return Buffer.concat(chunks).toString('utf8');
+  } catch (error) {
+    await reader.cancel().catch(() => undefined);
+    throw error;
+  } finally { reader.releaseLock(); }
+}
+
 export async function fetchHanoiCheckTracePage(sourceUrl: string) {
   const url = validatedHanoiCheckTraceUrl(sourceUrl);
   const response = await fetch(url, { redirect: 'manual', cache: 'no-store', signal: AbortSignal.timeout(15000), headers: { Accept: 'text/html' } });
@@ -147,8 +167,7 @@ export async function fetchHanoiCheckTracePage(sourceUrl: string) {
   if (!response.headers.get('content-type')?.includes('text/html')) throw new Error('Nguồn không phải trang HTML.');
   const length = Number(response.headers.get('content-length'));
   if (length > 3_000_000) throw new Error('Trang truy xuất vượt giới hạn 3 MB.');
-  const html = await response.text();
-  if (Buffer.byteLength(html) > 3_000_000) throw new Error('Trang truy xuất vượt giới hạn 3 MB.');
+  const html = await readBoundedHtml(response, 3_000_000);
   const detail = extractHanoiCheckTrace(html);
   if (!detail.traceCode) throw new Error('Không đọc được mã truy xuất từ trang nguồn.');
   return { sourceUrl: url, html, detail };

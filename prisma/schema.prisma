@@ -17,6 +17,11 @@ model Supplier {
   address         String?
   addressEn       String?
   taxCode         String?
+  phone           String?
+  website         String?
+  email           String?
+  description     String?
+  descriptionEn   String?
   storage         String?
   storageEn       String?
   shelfLife       String?
@@ -32,6 +37,7 @@ model Supplier {
   documents       Document[]
   auditLogs       AuditLog[]
   products        Product[]
+  hanoiCheckMappings HanoiCheckSupplierMapping[]
 
   @@index([code])
   @@index([name])
@@ -131,6 +137,7 @@ model Product {
   unit       String?
   storage    String?
   hygieneCertNumber String?
+  imageUrl   String?
   isPublic   Boolean   @default(false)
   supplier   Supplier  @relation(fields: [supplierId], references: [id], onDelete: Restrict)
   batches    Batch[]
@@ -153,10 +160,14 @@ model Batch {
   sourceSyncedAt DateTime?
   sourceTraceUrl String?
   sourcePayload  String?
+  sourcePayloadHash String?
+  sourceVerified Boolean?
+  sourceReviewStatus String @default("LEGACY")
   everPublished Boolean @default(false)
   isPublic   Boolean      @default(false)
   product    Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
   events     TraceEvent[]
+  sourceSnapshots HanoiCheckSnapshot[]
 
   @@unique([productId, code])
 }
@@ -170,7 +181,58 @@ model TraceEvent {
   details    String?
   location   String?
   isPublic   Boolean  @default(false)
+  sourceKey  String?
   batch      Batch    @relation(fields: [batchId], references: [id], onDelete: Restrict)
 
   @@index([batchId, occurredAt])
+  @@unique([batchId, sourceKey])
+}
+
+model HanoiCheckSupplierMapping {
+  externalCode String @id
+  supplierId Int
+  approvedAt DateTime @default(now())
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+}
+
+model HanoiCheckSnapshot {
+  id Int @id @default(autoincrement())
+  sourceKey String
+  sourceUrl String
+  payloadHash String
+  payload String
+  rawHtml String?
+  status String @default("PENDING")
+  reason String?
+  batchId Int?
+  fetchedAt DateTime @default(now())
+  reviewedAt DateTime?
+  batch Batch? @relation(fields: [batchId], references: [id], onDelete: Restrict)
+
+  @@unique([sourceKey, payloadHash])
+  @@index([status, fetchedAt])
+}
+
+model HanoiCheckSyncJob {
+  id String @id @default(cuid())
+  kind String
+  payload String
+  status String @default("QUEUED")
+  result String?
+  error String?
+  attempts Int @default(0)
+  leaseOwner String?
+  leaseExpiresAt DateTime?
+  createdAt DateTime @default(now())
+  startedAt DateTime?
+  completedAt DateTime?
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+}
+
+model IntegrationLease {
+  key String @id
+  owner String
+  expiresAt DateTime
 }

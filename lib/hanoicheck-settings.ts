@@ -1,7 +1,8 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
+import { DEFAULT_BASE_URL, normalizeHanoiCheckEndpoint } from '@/lib/hanoicheck-endpoint';
 
-export const DEFAULT_BASE_URL = 'https://ncc-api.hanoicheck.com.vn';
+export { DEFAULT_BASE_URL } from '@/lib/hanoicheck-endpoint';
 
 function encryptionKey() {
   const secret = process.env.INTEGRATION_ENCRYPTION_KEY?.trim() || process.env.AUTH_SECRET?.trim();
@@ -30,12 +31,24 @@ export function decryptHanoiCheckSecret(value: string) {
 
 export type HanoiCheckCredentials = { baseUrl: string; traceConnectionCode: string; clientId: string; clientSecret: string; hmacSecret: string };
 
-export async function getHanoiCheckCredentials(): Promise<HanoiCheckCredentials | null> {
-  const saved = await prisma.hanoiCheckIntegrationSettings.findUnique({ where: { id: 1 } });
+type CredentialRecord = {
+  baseUrl: string | null; traceConnectionCode: string | null;
+  encryptedClientId: string | null; encryptedClientSecret: string | null; encryptedHmacSecret: string | null;
+};
+
+export function shouldInvalidateHanoiCheckTokens(current: Pick<CredentialRecord, 'baseUrl' | 'traceConnectionCode'> | null, next: {
+  baseUrl?: string; traceConnectionCode?: string; clientId?: string; clientSecret?: string; hmacSecret?: string;
+}) {
+  return Boolean(next.clientId || next.clientSecret || next.hmacSecret ||
+    (next.baseUrl && next.baseUrl !== current?.baseUrl) ||
+    (next.traceConnectionCode && next.traceConnectionCode !== current?.traceConnectionCode));
+}
+
+export function decodeHanoiCheckCredentials(saved: CredentialRecord | null): HanoiCheckCredentials | null {
   if (!saved?.encryptedClientId || !saved.encryptedClientSecret || !saved.encryptedHmacSecret || !saved.traceConnectionCode) return null;
   try {
     return {
-      baseUrl: saved.baseUrl || DEFAULT_BASE_URL,
+      baseUrl: normalizeHanoiCheckEndpoint(saved.baseUrl || DEFAULT_BASE_URL),
       traceConnectionCode: saved.traceConnectionCode,
       clientId: decryptHanoiCheckSecret(saved.encryptedClientId),
       clientSecret: decryptHanoiCheckSecret(saved.encryptedClientSecret),
@@ -44,11 +57,17 @@ export async function getHanoiCheckCredentials(): Promise<HanoiCheckCredentials 
   } catch { return null; }
 }
 
+export async function getHanoiCheckCredentials(): Promise<HanoiCheckCredentials | null> {
+  const saved = await prisma.hanoiCheckIntegrationSettings.findUnique({ where: { id: 1 } });
+  return decodeHanoiCheckCredentials(saved);
+}
+
 export async function getHanoiCheckStatus() {
   const saved = await prisma.hanoiCheckIntegrationSettings.findUnique({ where: { id: 1 } });
   let credentialsError = false;
   if (saved?.encryptedClientId || saved?.encryptedClientSecret || saved?.encryptedHmacSecret) {
     try {
+      normalizeHanoiCheckEndpoint(saved.baseUrl || DEFAULT_BASE_URL);
       if (saved.encryptedClientId) decryptHanoiCheckSecret(saved.encryptedClientId);
       if (saved.encryptedClientSecret) decryptHanoiCheckSecret(saved.encryptedClientSecret);
       if (saved.encryptedHmacSecret) decryptHanoiCheckSecret(saved.encryptedHmacSecret);

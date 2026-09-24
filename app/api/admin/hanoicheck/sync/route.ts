@@ -1,34 +1,25 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import { isAdmin } from '@/lib/auth';
 import { rejectUntrustedMutation } from '@/lib/security';
-import { syncBatchesFromOrders } from '@/lib/hanoicheck-sync';
-import { HanoiCheckApiError } from '@/lib/hanoicheck-errors';
+import { enqueueSyncJob } from '@/lib/hanoicheck-jobs';
+import { vietnamToday } from '@/lib/hanoicheck-normalize';
+import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
-
-const isoDate = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function POST(request: Request) {
   if (!(await isAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const rejected = rejectUntrustedMutation(request); if (rejected) return rejected;
   const body = await request.json().catch(() => ({}));
-  const today = new Date().toISOString().slice(0, 10);
-  const dateFrom = typeof body.dateFrom === 'string' && isoDate.test(body.dateFrom) ? body.dateFrom : today;
-  const dateTo = typeof body.dateTo === 'string' && isoDate.test(body.dateTo) ? body.dateTo : dateFrom;
-  if (dateTo < dateFrom) return NextResponse.json({ error: 'Ngày kết thúc phải sau ngày bắt đầu.' }, { status: 400 });
+  const today = vietnamToday();
+  const dateFrom = typeof body.dateFrom === 'string' ? body.dateFrom : today;
+  const dateTo = typeof body.dateTo === 'string' ? body.dateTo : dateFrom;
   try {
-    const result = await syncBatchesFromOrders(dateFrom, dateTo);
-    const status = result.skipped.length && !result.created && !result.updated ? 'FAILED' : result.skipped.length ? 'PARTIAL' : 'OK';
-    await prisma.hanoiCheckIntegrationSettings.upsert({
-      where: { id: 1 },
-      create: { id: 1, lastSyncedAt: new Date(), lastSyncStatus: status, lastSyncCount: result.created + result.updated },
-      update: { lastSyncedAt: new Date(), lastSyncStatus: status, lastSyncCount: result.created + result.updated },
-    });
-    await prisma.auditLog.create({ data: { action: 'SYNC', entity: 'HANOICHECK_BATCHES', summary: `Đồng bộ HanoiCheck ${dateFrom}→${dateTo}: ${result.processed} lô đọc, ${result.created} mới, ${result.updated} cập nhật, ${result.skipped.length} bỏ qua` } });
-    return NextResponse.json(result, { headers: { 'Cache-Control': 'no-store' } });
+    const job = await enqueueSyncJob({ kind: 'ORDERS', dateFrom, dateTo });
+    await prisma.auditLog.create({ data: { action: 'CREATE', entity: 'HANOICHECK_JOB', entityId: job.id, summary: `Tạo lượt đọc đơn hàng HanoiCheck ${dateFrom}→${dateTo}.` } });
+    return NextResponse.json(job, { status: 202, headers: { 'Cache-Control': 'no-store', Location: `/api/admin/hanoicheck/jobs/${job.id}` } });
   } catch (error) {
-    if (error instanceof HanoiCheckApiError) return NextResponse.json({ error: error.message }, { status: error.status === 401 || error.status === 503 ? error.status : 502 });
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Không đồng bộ được từ HanoiCheck.' }, { status: 502 });
+    const message = error instanceof Error ? error.message : 'Không tạo được lượt đồng bộ HanoiCheck.';
+    return NextResponse.json({ error: message }, { status: message.includes('nhiều lượt') ? 429 : 400 });
   }
 }

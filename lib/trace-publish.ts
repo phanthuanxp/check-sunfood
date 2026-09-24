@@ -2,7 +2,29 @@ import { prisma } from '@/lib/prisma';
 
 export type PublishResult = { ok: true } | { ok: false; status: 404 | 409; error: string };
 
-type BatchAvailability = { isPublic: boolean; product: { isPublic: boolean; supplier: { verificationStatus: string; status: string } } };
+type BatchAvailability = {
+  isPublic: boolean;
+  sourceSystem?: string | null;
+  sourcePayload?: string | null;
+  sourceVerified?: boolean | null;
+  sourceReviewStatus?: string | null;
+  product: { isPublic: boolean; supplier: { verificationStatus: string; status: string } };
+};
+
+function hasVerifiedLegacyPayload(payload: string | null | undefined) {
+  if (!payload) return false;
+  try {
+    const parsed = JSON.parse(payload) as { verified?: unknown };
+    return parsed?.verified === true;
+  } catch { return false; }
+}
+
+/** Local lots use Sunfood's own approval flow. HanoiCheck lots additionally require verified source evidence. */
+export function isBatchSourceApproved(batch: Pick<BatchAvailability, 'sourceSystem' | 'sourcePayload' | 'sourceVerified' | 'sourceReviewStatus'>) {
+  if (batch.sourceSystem !== 'HANOICHECK') return true;
+  if (batch.sourceReviewStatus === 'APPROVED') return batch.sourceVerified === true;
+  return batch.sourceReviewStatus === 'LEGACY' && hasVerifiedLegacyPayload(batch.sourcePayload);
+}
 
 /**
  * Single source of truth for "is this batch actually visible on the public site right now" —
@@ -11,7 +33,8 @@ type BatchAvailability = { isPublic: boolean; product: { isPublic: boolean; supp
  * be approved in the admin but still show as unavailable on the public page).
  */
 export function isBatchAvailable(batch: BatchAvailability) {
-  return batch.isPublic && batch.product.isPublic && batch.product.supplier.verificationStatus === 'VERIFIED' && batch.product.supplier.status === 'ACTIVE';
+  return batch.isPublic && batch.product.isPublic && batch.product.supplier.verificationStatus === 'VERIFIED' &&
+    batch.product.supplier.status === 'ACTIVE' && isBatchSourceApproved(batch);
 }
 
 export async function setProductPublic(id: number, isPublic: boolean): Promise<PublishResult> {
@@ -29,8 +52,10 @@ export async function setProductPublic(id: number, isPublic: boolean): Promise<P
 export async function setBatchPublic(id: number, isPublic: boolean): Promise<PublishResult> {
   const batch = await prisma.batch.findUnique({ where: { id }, include: { product: { include: { supplier: true } } } });
   if (!batch) return { ok: false, status: 404, error: 'Không tìm thấy lô.' };
-  if (isPublic && (!batch.product.isPublic || batch.product.supplier.verificationStatus !== 'VERIFIED' || !batch.receivedAt))
-    return { ok: false, status: 409, error: 'Cần duyệt sản phẩm/NCC và điền ngày nhập lô trước khi công khai.' };
+  if (isPublic && (!batch.product.isPublic || batch.product.supplier.verificationStatus !== 'VERIFIED' || batch.product.supplier.status !== 'ACTIVE' || !batch.receivedAt))
+    return { ok: false, status: 409, error: 'Cần duyệt sản phẩm, xác minh NCC đang hoạt động và điền ngày nhập lô trước khi công khai.' };
+  if (isPublic && !isBatchSourceApproved(batch))
+    return { ok: false, status: 409, error: 'Lô HanoiCheck phải có nguồn đã xác thực và được Sunfood đối chiếu trước khi công khai.' };
   await prisma.batch.update({ where: { id }, data: { isPublic, everPublished: isPublic ? true : batch.everPublished } });
   await prisma.auditLog.create({ data: { supplierId: batch.product.supplierId, action: 'PUBLISH', entity: 'BATCH', entityId: String(id), summary: `${isPublic ? 'Công khai' : 'Ẩn'} lô ${batch.code}` } });
   return { ok: true };

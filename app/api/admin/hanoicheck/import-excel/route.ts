@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { isAdmin } from '@/lib/auth';
 import { rejectUntrustedMutation } from '@/lib/security';
 import { parseFirstSheet, sheetToRecords } from '@/lib/xlsx-parse';
-import { syncBatchesFromExcelRecords } from '@/lib/hanoicheck-sync';
+import { enqueueSyncJob } from '@/lib/hanoicheck-jobs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -39,7 +39,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'File thiếu cột "Link truy xuất". Xuất đúng báo cáo QL lô nhập hàng từ cổng HanoiCheck.' }, { status: 422 });
   if (records.length > 500) return NextResponse.json({ error: 'Tối đa 500 dòng mỗi lần nhập; chia nhỏ file và thử lại.' }, { status: 422 });
 
-  const result = await syncBatchesFromExcelRecords(records);
-  await prisma.auditLog.create({ data: { action: 'SYNC', entity: 'HANOICHECK_BATCHES', summary: `Nhập lô từ file Excel "${file.name}": ${result.processed} dòng, ${result.created} mới, ${result.updated} cập nhật, ${result.skipped.length} bỏ qua` } });
-  return NextResponse.json(result, { headers: { 'Cache-Control': 'no-store' } });
+  const linkKey = Object.keys(records[0]).find(key => /link truy xuất/i.test(key))!;
+  const urls = records.map(record => record[linkKey]?.trim()).filter((url): url is string => Boolean(url));
+  if (!urls.length) return NextResponse.json({ error: 'File không có URL truy xuất nào.' }, { status: 422 });
+  try {
+    const job = await enqueueSyncJob({ kind: 'URLS', urls });
+    await prisma.auditLog.create({ data: { action: 'CREATE', entity: 'HANOICHECK_JOB', entityId: job.id, summary: `Tạo lượt nhập ${urls.length} URL từ file Excel "${file.name}".` } });
+    return NextResponse.json(job, { status: 202, headers: { 'Cache-Control': 'no-store', Location: `/api/admin/hanoicheck/jobs/${job.id}` } });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Không tạo được lượt nhập file.';
+    return NextResponse.json({ error: message }, { status: message.includes('nhiều lượt') ? 429 : 422 });
+  }
 }
