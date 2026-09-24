@@ -13,7 +13,7 @@ type BatchRow = {
 type SupplierOption = { id: number; code: string; name: string };
 type SupplierSummary = { id: number; code: string; name: string; address: string | null; verificationStatus: string; status: string };
 type Event = { id: number; title: string; stage: string; occurredAt: string; isPublic: boolean; location: string | null; details: string | null };
-type ProductDetail = { id: number; name: string; sku: string | null; gtin: string | null; origin: string | null; unit: string | null; storage: string | null; hygieneCertNumber: string | null; isPublic: boolean };
+type ProductDetail = { id: number; name: string; sku: string | null; gtin: string | null; origin: string | null; unit: string | null; storage: string | null; hygieneCertNumber: string | null; imageUrl: string | null; isPublic: boolean };
 type BatchDetail = Omit<BatchRow, 'product' | 'supplier'> & { events: Event[]; product: ProductDetail; supplier: SupplierSummary };
 type ProductOption = { id: number; name: string; supplierCode: string; supplierName: string };
 type OrphanProduct = { id: number; name: string; sku: string | null; isPublic: boolean; supplierCode: string; supplierName: string };
@@ -245,6 +245,22 @@ export default function BatchesTable() {
       const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Không lưu được.');
       await refresh(); await openDrawer(drawerBatch.id); notify('Đã lưu sản phẩm.');
     } catch (error) { notify(error instanceof Error ? error.message : 'Không lưu được.', 'error'); }
+    finally { setBusy(false); }
+  }
+
+  async function uploadProductImage(file: File) {
+    if (!drawerBatch) return;
+    setBusy(true); notify('Đang tải ảnh sản phẩm…');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const uploadResponse = await fetch('/api/upload', { method: 'POST', body: formData });
+      const uploadResult = await uploadResponse.json();
+      if (!uploadResponse.ok) throw new Error(uploadResult.error || 'Không tải ảnh lên được.');
+      const response = await fetch('/api/admin/trace', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'product', id: drawerBatch.product.id, supplierId: drawerBatch.supplier.id, name: drawerBatch.product.name, sku: drawerBatch.product.sku || '', gtin: drawerBatch.product.gtin || '', storage: drawerBatch.product.storage || '', hygieneCertNumber: drawerBatch.product.hygieneCertNumber || '', imageUrl: uploadResult.fileUrl }) });
+      const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Không lưu ảnh sản phẩm được.');
+      await refresh(); await openDrawer(drawerBatch.id); notify('Đã cập nhật ảnh sản phẩm.');
+    } catch (error) { notify(error instanceof Error ? error.message : 'Không cập nhật được ảnh sản phẩm.', 'error'); }
     finally { setBusy(false); }
   }
 
@@ -525,6 +541,9 @@ export default function BatchesTable() {
               </label>
               <label>Bảo quản <input name="storage" defaultValue={drawerBatch.product.storage || ''} placeholder="VD: Bảo quản lạnh 2–6°C" /></label>
               <label>Mã K.T.V.S.T.Y <small>Chỉ điền cho sản phẩm thịt lợn có mã kiểm dịch thú y thật; để trống với sản phẩm khác.</small><input name="hygieneCertNumber" defaultValue={drawerBatch.product.hygieneCertNumber || ''} placeholder="VD: 12.033.02" /></label>
+              <label className="wide">Ảnh sản phẩm khổ lớn <small>Upload JPG/PNG tối đa 10 MB; ảnh này hiển thị ở block đầu trang truy xuất.</small><input type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png" onChange={event => { const file = event.currentTarget.files?.[0]; if (file) void uploadProductImage(file); event.currentTarget.value = ''; }} /></label>
+              {drawerBatch.product.imageUrl && <div className="trace-product-image-preview wide"><img src={drawerBatch.product.imageUrl} alt={`Ảnh ${drawerBatch.product.name}`} /><span>{drawerBatch.product.imageUrl}</span></div>}
+              <input type="hidden" name="imageUrl" defaultValue={drawerBatch.product.imageUrl || ''} />
               <div className="trace-row-actions">
                 <button className="primary-btn" disabled={busy}>Lưu sản phẩm</button>
                 <button className="secondary-btn" type="button" disabled={busy} onClick={() => toggleProductPublic(!drawerBatch.product.isPublic)}>{drawerBatch.product.isPublic ? '⊘ Ẩn sản phẩm' : '✓ Duyệt sản phẩm'}</button>

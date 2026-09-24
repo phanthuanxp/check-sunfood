@@ -1,36 +1,29 @@
-/* Header/hero/footer chrome now comes from the shared .trace-header/.trace-hero/
-   .trace-footer classes in globals.css (same as the homepage and supplier page);
-   only the lot-specific content below keeps its own rules. */
-.lot-page { color: #163b2a; font-family: inherit; font-size: 15px; }
-.lot-hero-address { margin: 3px 0 0; font-size: 13px; color: #a9d6bc; line-height: 1.4; max-width: 640px; }
-.lot-hero-badge { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 14px; color: #fff; font-size: 13px; font-weight: 700; }
-.lot-page .code-pill b { color: #fff; }
+/* Mobile-first: base rules target phone screens (the vast majority of scans); the
+   min-width query below only relaxes spacing/width for tablet+/desktop viewers. */
+.lot-page { min-height: 100vh; background: #f1f8f4; color: #163b2a; padding: 0 14px 28px; font-family: inherit; font-size: 15px; }
+.lot-page > header { max-width: 640px; margin: auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 0; }
+.lot-page > header a { font-weight: 900; font-size: 14px; color: #075e3c; text-decoration: none; }
+.lot-page > header span { font-size: 10px; letter-spacing: .1em; font-weight: 800; color: #61816c; }
 
-.lot-hero-codes { display: flex; gap: 28px; flex-wrap: nowrap; margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.18); }
-.lot-page .lot-hero-codes .code-pill { display: inline-flex; align-items: baseline; gap: 6px; background: none; border: 0; border-radius: 0; padding: 0; min-height: 0; color: #bcead0; font-size: 13px; font-weight: 400; flex: 0 0 auto; }
-.lot-page .lot-hero-codes .code-pill b { font-size: 14px; font-weight: 800; }
-.lot-page .lot-hero-codes .code-pill:last-child { flex: 1 1 auto; min-width: 0; }
-.lot-page .lot-hero-codes .code-pill:last-child b { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
-.lot-hero-title-icon { margin-right: 10px; }
-.lot-page .trace-hero { min-height: 0; }
+.lot-hero, .lot-card { max-width: 640px; margin: 0 auto 12px; padding: 16px 18px; border-radius: 16px; }
+.lot-hero { background: linear-gradient(130deg, #07432c, #08794d); color: #fff; }
+.lot-hero > p:first-child { font-size: 11px; letter-spacing: .02em; color: #bdebd3; font-weight: 700; margin: 0 0 6px; text-transform: none; }
 
-.lot-hero-has-qr .lot-hero-badge,
-.lot-hero-has-qr .hero-content h1 { margin-right: 116px; }
-.lot-hero-qr { position: absolute; top: 28px; right: 24px; width: 84px; height: 84px; padding: 6px; background: #fff; border: 0; border-radius: 10px; cursor: pointer; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.3); }
-.lot-hero-qr img { display: block; width: 100%; height: 100%; }
-.lot-qr-modal-backdrop { position: fixed; inset: 0; z-index: 60; background: rgba(6, 30, 20, 0.72); display: grid; place-items: center; padding: 20px; }
-.lot-qr-modal { width: min(320px, 100%); background: #fff; border-radius: 16px; padding: 24px; text-align: center; position: relative; }
-.lot-qr-modal img { width: 100%; height: auto; }
-.lot-qr-modal p { margin: 12px 0 0; font-weight: 700; color: #163b2a; }
-.lot-qr-modal-close { position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; border: 0; border-radius: 50%; background: #f1f5f3; color: #45564d; font-size: 18px; cursor: pointer; }
-.lot-qr-modal-actions { display: flex; gap: 10px; margin-top: 14px; }
-.lot-qr-print-link { flex: 1; display: inline-block; padding: 10px 14px; border-radius: 9px; background: #0b7648; color: #fff; font-weight: 700; font-size: 13px; text-decoration: none; }
-.lot-qr-print-link:first-child { background: #fff; color: #0b7648; border: 1px solid #0b7648; }
+.lot-verify-line { display: inline-flex; align-items: center; gap: 7px; }
+.lot-verify-line img { width: 18px; height: 18px; object-fit: contain; border-radius: 4px; background: #fff; padding: 2px; box-shadow: 0 1px 4px #00251424; }
 
-.lot-container { margin-top: 22px; padding-top: 0; }
-.lot-card { max-width: 640px; margin: 0 0 12px; padding: 16px 18px; border-radius: 16px; }
+.lot-hero h1 { margin: 10px 0 0; font-size: 21px; line-height: 1.25; font-weight: 800; overflow-wrap: anywhere; text-align: center; }
+.lot-product-visual { width: 112px; height: 112px; margin: 14px auto 0; display: grid; place-items: center; border-radius: 24px; background: linear-gradient(145deg, #fffdf7, #f7ead7); border: 1px solid #ffffff80; box-shadow: inset 0 1px 0 #fff, 0 16px 34px #03241838; }
+.lot-product-visual span { font-size: 58px; line-height: 1; filter: drop-shadow(0 8px 12px #4a1a121f); }
+.lot-product-photo { display: block; width: 100%; max-width: 420px; aspect-ratio: 16 / 10; margin: 14px auto 0; object-fit: cover; border-radius: 22px; border: 1px solid #ffffff80; box-shadow: 0 16px 34px #03241838; background: #eef5f0; }
+.lot-hero-supplier { margin: 6px 0 0; font-size: 13px; font-weight: 600; color: #d9f2e3; line-height: 1.4; }
+.lot-hero-address { margin: 3px 0 0; font-size: 12px; color: #a9d6bc; line-height: 1.4; }
+.lot-hero-codes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; padding-top: 12px; border-top: 1px solid #ffffff26; }
+.lot-hero-codes-top { margin-top: 10px; padding-top: 0; border-top: 0; justify-content: center; }
+.lot-hero-codes span { font-size: 11px; color: #bdebd3; display: inline-flex; align-items: baseline; gap: 4px; padding: 7px 10px; border-radius: 999px; background: #ffffff14; }
+.lot-hero-codes b { font-size: 12px; color: #fff; font-weight: 700; overflow-wrap: anywhere; }
 
-.lot-expiry-badge { max-width: 640px; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-radius: 12px; font-weight: 800; font-size: 13px; }
+.lot-expiry-badge { max-width: 640px; margin: 0 auto 12px; display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-radius: 12px; font-weight: 800; font-size: 13px; }
 .lot-expiry-badge.valid { background: #e3f6e9; color: #0b6e40; }
 .lot-expiry-badge.warning { background: #fff3d8; color: #8a5a00; }
 .lot-expiry-badge.expired { background: #fbdede; color: #a3282f; }
@@ -64,21 +57,21 @@
 .lot-employees ul { margin: 8px 0 0; padding-left: 16px; font-size: 12px; color: #3f6650; }
 .lot-employees ul li { margin-bottom: 4px; }
 
-.trace-hero.lot-hero-hold { background: linear-gradient(130deg, #56361e, #9a561b); }
+.lot-hero-hold { background: linear-gradient(130deg, #56361e, #9a561b); }
+.lot-hero-hold > p:not(:first-child) { line-height: 1.6; font-size: 14px; }
+
+.lot-page > footer { max-width: 640px; margin: 20px auto 0; text-align: center; color: #607b6a; font-size: 11px; line-height: 1.5; }
 
 @media (min-width: 640px) {
-  .lot-card { padding: 24px 28px; border-radius: 18px; }
+  .lot-page { padding: 0 16px 36px; font-size: 16px; }
+  .lot-page > header { padding: 18px 0; }
+  .lot-page > header a { font-size: 15px; }
+  .lot-hero, .lot-card { padding: 24px 28px; border-radius: 18px; }
+  .lot-hero h1 { font-size: 26px; }
+  .lot-product-visual { width: 128px; height: 128px; border-radius: 28px; }
+  .lot-product-visual span { font-size: 66px; }
+  .lot-product-photo { max-width: 480px; border-radius: 26px; }
+  .lot-hero-supplier { font-size: 14px; }
   .lot-info-rows dt { font-size: 14px; }
   .lot-info-rows dd { font-size: 15px; }
-}
-
-@media (max-width: 640px) {
-  .lot-hero-qr { top: 20px; right: 16px; width: 80px; height: 80px; padding: 4px; border-radius: 8px; }
-  .lot-hero-has-qr .lot-hero-badge,
-  .lot-hero-has-qr .hero-content h1 { margin-right: 104px; }
-  .lot-page .trace-hero { border-radius: 0; }
-  .lot-page .hero-content h1 { margin-top: 12px; margin-bottom: 18px; font-size: 25px; line-height: 1.15; }
-  .lot-hero-codes { gap: 16px; }
-  .lot-page .lot-hero-codes .code-pill { font-size: 11px; }
-  .lot-page .lot-hero-codes .code-pill b { font-size: 12px; }
 }

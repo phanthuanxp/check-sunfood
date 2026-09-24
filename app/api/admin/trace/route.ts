@@ -29,7 +29,7 @@ export async function POST(request: Request) {
       if (!supplier || !value(body.name)) return NextResponse.json({ error: 'Chọn NCC và nhập tên sản phẩm.' }, { status: 400 });
       const gtin = optional(body.gtin, 14);
       if (gtin && !/^\d{8,14}$/.test(gtin)) return NextResponse.json({ error: 'GTIN phải gồm 8–14 chữ số.' }, { status: 400 });
-      const product = await prisma.product.create({ data: { supplierId, name: value(body.name), sku: optional(body.sku), gtin, origin: optional(body.origin), unit: optional(body.unit), storage: optional(body.storage) } });
+      const product = await prisma.product.create({ data: { supplierId, name: value(body.name), sku: optional(body.sku), gtin, origin: optional(body.origin), unit: optional(body.unit), storage: optional(body.storage), imageUrl: optional(body.imageUrl, 500) } });
       await prisma.auditLog.create({ data: { supplierId, action: 'CREATE', entity: 'PRODUCT', entityId: String(product.id), summary: `Tạo sản phẩm nháp ${product.name} cho ${supplier.code}` } });
       return NextResponse.json(product, { status: 201 });
     }
@@ -90,7 +90,7 @@ export async function PUT(request: Request) {
       const supplier = supplierId === product.supplierId ? product : await prisma.supplier.findUnique({ where: { id: supplierId } });
       if (!supplier) return NextResponse.json({ error: 'Không tìm thấy nhà cung cấp.' }, { status: 400 });
       const data = {
-        supplierId, name: value(body.name), sku: optional(body.sku), gtin, storage: optional(body.storage), hygieneCertNumber: optional(body.hygieneCertNumber, 100),
+        supplierId, name: value(body.name), sku: optional(body.sku), gtin, storage: optional(body.storage), hygieneCertNumber: optional(body.hygieneCertNumber, 100), imageUrl: optional(body.imageUrl, 500),
         origin: body.origin === undefined ? product.origin : optional(body.origin),
         unit: body.unit === undefined ? product.unit : optional(body.unit),
       };

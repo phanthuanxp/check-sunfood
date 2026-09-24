@@ -11,7 +11,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const batch = await prisma.batch.findUnique({
     where: { id },
     include: {
-      product: { select: { id: true, name: true, sku: true, gtin: true, origin: true, unit: true, storage: true, hygieneCertNumber: true, isPublic: true, supplier: { select: { id: true, code: true, name: true, address: true, verificationStatus: true, status: true } } } },
+      product: { select: { id: true, name: true, sku: true, gtin: true, origin: true, unit: true, storage: true, hygieneCertNumber: true, imageUrl: true, isPublic: true, supplier: { select: { id: true, code: true, name: true, address: true, verificationStatus: true, status: true } } } },
       events: { orderBy: { occurredAt: 'asc' } },
     },
   });
