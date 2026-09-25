@@ -4,6 +4,7 @@ import { isAdmin } from '@/lib/auth';
 import { audit } from '@/lib/audit';
 import { getExpiryState } from '@/lib/documents';
 import { rejectUntrustedMutation } from '@/lib/security';
+import { isExternalDocUrl, normalizeExternalDocUrl } from '@/lib/external-doc-link';
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await isAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -13,7 +14,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const existing = await prisma.document.findUnique({ where: { id: documentId }, include: { supplier: true } });
   if (!existing) return NextResponse.json({ error: 'Document not found' }, { status: 404 });
   const body = await request.json();
-  const fileUrl = String(body.fileUrl || existing.fileUrl);
+  const rawFileUrl = String(body.fileUrl || existing.fileUrl);
+  const fileUrl = isExternalDocUrl(rawFileUrl) ? normalizeExternalDocUrl(rawFileUrl) : rawFileUrl;
+  if (!fileUrl) return NextResponse.json({ error: 'Link không hợp lệ. Dùng link chia sẻ Google Drive ở chế độ công khai.' }, { status: 400 });
   const expiresAt = body.expiresAt ? new Date(body.expiresAt) : null;
   const document = await prisma.$transaction(async tx => {
     if (fileUrl !== existing.fileUrl) await tx.documentVersion.create({ data: { documentId, fileUrl: existing.fileUrl, note: 'Phiên bản trước khi thay tệp' } });

@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   if (!(file instanceof File)) return NextResponse.json({ error: 'Chưa chọn tệp.' }, { status: 400 });
   const extension = allowed.get(file.type);
   if (!extension) return NextResponse.json({ error: 'Chỉ chấp nhận PDF, JPG hoặc PNG.' }, { status: 415 });
-  if (file.size > 10 * 1024 * 1024) return NextResponse.json({ error: 'Tệp vượt quá giới hạn 10 MB.' }, { status: 413 });
+  if (file.size > 50 * 1024 * 1024) return NextResponse.json({ error: 'Tệp vượt quá giới hạn 50 MB.' }, { status: 413 });
   const bytes = new Uint8Array(await file.arrayBuffer());
   const validSignature = extension === '.pdf'
     ? String.fromCharCode(...bytes.slice(0, 5)) === '%PDF-'

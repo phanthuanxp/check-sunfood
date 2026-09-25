@@ -6,6 +6,7 @@ import { FormEvent, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { DataWarning } from "@/lib/data-warnings";
+import { isExternalDocUrl } from "@/lib/external-doc-link";
 import TraceWorkspace from "./trace/TraceWorkspace";
 import AccountSettingsForm from "./settings/account/AccountSettingsForm";
 import AiSettingsForm from "./settings/ai/AiSettingsForm";
@@ -50,6 +51,7 @@ type Supplier = {
   shelfLifeEn: string | null;
   notes: string | null;
   notesEn: string | null;
+  logoUrl: string | null;
   status: string;
   verificationStatus: string;
   documents: DocumentItem[];
@@ -82,6 +84,7 @@ const emptySupplier = {
   shelfLifeEn: "",
   notes: "",
   notesEn: "",
+  logoUrl: "",
   status: "ACTIVE",
   verificationStatus: "PENDING",
 };
@@ -157,6 +160,9 @@ export default function AdminDashboard({
   const [supplierForm, setSupplierForm] =
     useState<Record<string, string>>(emptySupplier);
   const [showSupplierForm, setShowSupplierForm] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [removeLogo, setRemoveLogo] = useState(false);
   const [editingDocument, setEditingDocument] = useState<DocumentItem | null>(
     null,
   );
@@ -169,6 +175,8 @@ export default function AdminDashboard({
   const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [docFields, setDocFields] = useState<Record<DocFieldKey, string>>(emptyDocFields);
+  const [docLinkMode, setDocLinkMode] = useState<"upload" | "link">("upload");
+  const [docExternalUrl, setDocExternalUrl] = useState("");
 
   const docs = useMemo(
     () =>
@@ -221,6 +229,8 @@ export default function AdminDashboard({
           )
         : emptySupplier,
     );
+    setLogoPreview(null);
+    setRemoveLogo(false);
     setShowSupplierForm(true);
     setMessage("");
   }
@@ -229,12 +239,27 @@ export default function AdminDashboard({
     event.preventDefault();
     setBusy(true);
     setMessage("");
+    let logoUrl = supplierForm.logoUrl || "";
+    const logoFile = new FormData(event.currentTarget).get("logoFile");
+    if (logoFile instanceof File && logoFile.size > 0) {
+      const upload = new FormData();
+      upload.set("file", logoFile);
+      const uploaded = await fetch("/api/upload", { method: "POST", body: upload });
+      const uploadResult = await uploaded.json();
+      if (!uploaded.ok) {
+        setBusy(false);
+        return setMessage(uploadResult.error || "Tải logo thất bại.");
+      }
+      logoUrl = uploadResult.fileUrl;
+    } else if (removeLogo) {
+      logoUrl = "";
+    }
     const response = await fetch(
       selected ? `/api/suppliers/${selected.code}` : "/api/suppliers",
       {
         method: selected ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(supplierForm),
+        body: JSON.stringify({ ...supplierForm, logoUrl }),
       },
     );
     const data = await response.json();
@@ -260,6 +285,8 @@ export default function AdminDashboard({
     setShowDocumentForm(false);
     setAiSuggestion(null);
     setDocFields(emptyDocFields);
+    setDocLinkMode("upload");
+    setDocExternalUrl("");
     setMessage("");
   }
 
@@ -270,24 +297,33 @@ export default function AdminDashboard({
     setMessage("");
     const form = new FormData(event.currentTarget);
     let fileUrl = editingDocument?.fileUrl || "";
-    const file = form.get("file");
-    if (file instanceof File && file.size > 0) {
-      const upload = new FormData();
-      upload.set("file", file);
-      const uploaded = await fetch("/api/upload", {
-        method: "POST",
-        body: upload,
-      });
-      const result = await uploaded.json();
-      if (!uploaded.ok) {
+    if (docLinkMode === "link") {
+      const trimmed = docExternalUrl.trim();
+      if (trimmed) fileUrl = trimmed;
+      if (!fileUrl) {
         setBusy(false);
-        return setMessage(result.error || "Tải tệp thất bại.");
+        return setMessage("Vui lòng dán link Google Drive công khai của hồ sơ.");
       }
-      fileUrl = result.fileUrl;
-    }
-    if (!fileUrl) {
-      setBusy(false);
-      return setMessage("Vui lòng chọn tệp PDF/JPG/PNG.");
+    } else {
+      const file = form.get("file");
+      if (file instanceof File && file.size > 0) {
+        const upload = new FormData();
+        upload.set("file", file);
+        const uploaded = await fetch("/api/upload", {
+          method: "POST",
+          body: upload,
+        });
+        const result = await uploaded.json();
+        if (!uploaded.ok) {
+          setBusy(false);
+          return setMessage(result.error || "Tải tệp thất bại.");
+        }
+        fileUrl = result.fileUrl;
+      }
+      if (!fileUrl) {
+        setBusy(false);
+        return setMessage("Vui lòng chọn tệp PDF/JPG/PNG.");
+      }
     }
     const payload = {
       title: form.get("title"),
@@ -753,6 +789,28 @@ export default function AdminDashboard({
               </button>
             </div>
             <div className="form-grid">
+              <label className="wide">Logo nhà cung cấp <small>Hiển thị thay cho số thứ tự trên trang truy xuất công khai. Chấp nhận JPG/PNG, tối đa 50MB.</small>
+                <div className="trace-image-row">
+                  {!removeLogo && (logoPreview || supplierForm.logoUrl) && <img className="trace-product-thumb" src={logoPreview || supplierForm.logoUrl} alt="" />}
+                  <div className="trace-image-actions">
+                    <input type="file" name="logoFile" accept="image/jpeg,image/png" ref={logoInputRef} onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (!file) return;
+                      setRemoveLogo(false);
+                      const reader = new FileReader();
+                      reader.onload = () => setLogoPreview(typeof reader.result === "string" ? reader.result : null);
+                      reader.readAsDataURL(file);
+                    }} />
+                    {!removeLogo && (supplierForm.logoUrl || logoPreview) && (
+                      <button type="button" className="secondary-btn" onClick={() => {
+                        setRemoveLogo(true);
+                        setLogoPreview(null);
+                        if (logoInputRef.current) logoInputRef.current.value = "";
+                      }}>✕ Xóa logo</button>
+                    )}
+                  </div>
+                </div>
+              </label>
               {[
                 ["code", "Mã NCC"],
                 ["name", "Tên nhà cung cấp"],
@@ -865,6 +923,8 @@ export default function AdminDashboard({
                 onClick={() => {
                   setEditingDocument(null);
                   setDocFields(emptyDocFields);
+                  setDocLinkMode("upload");
+                  setDocExternalUrl("");
                   setAiSuggestion(null);
                   setShowDocumentForm(true);
                 }}
@@ -924,6 +984,9 @@ export default function AdminDashboard({
                         onClick={() => {
                           setEditingDocument(d);
                           setDocFields({ title: d.title, category: d.category, issuedAt: d.issuedAt?.slice(0, 10) || "", expiresAt: d.expiresAt?.slice(0, 10) || "" });
+                          const external = isExternalDocUrl(d.fileUrl);
+                          setDocLinkMode(external ? "link" : "upload");
+                          setDocExternalUrl(external ? d.fileUrl : "");
                           setAiSuggestion(null);
                           setShowDocumentForm(true);
                         }}
@@ -1014,17 +1077,56 @@ export default function AdminDashboard({
                     />
                   </label>
                 </div>
-                <label>
-                  {editingDocument
-                    ? "Tệp thay thế (không bắt buộc)"
-                    : "Tệp PDF/JPG/PNG (tối đa 10 MB)"}
-                  <input
-                    name="file"
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-                    required={!editingDocument}
-                  />
-                </label>
+                <div className="doc-source-toggle" role="group" aria-label="Nguồn tệp hồ sơ">
+                  <button
+                    type="button"
+                    className={`secondary-btn${docLinkMode === "upload" ? " active" : ""}`}
+                    onClick={() => setDocLinkMode("upload")}
+                  >
+                    Tải file lên
+                  </button>
+                  <button
+                    type="button"
+                    className={`secondary-btn${docLinkMode === "link" ? " active" : ""}`}
+                    onClick={() => setDocLinkMode("link")}
+                  >
+                    Dán link Google Drive
+                  </button>
+                </div>
+                {docLinkMode === "upload" ? (
+                  <label>
+                    {editingDocument
+                      ? "Tệp thay thế (không bắt buộc)"
+                      : "Tệp PDF/JPG/PNG (tối đa 50 MB)"}
+                    <input
+                      name="file"
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                      required={!editingDocument}
+                    />
+                  </label>
+                ) : (
+                  <label>
+                    Link Google Drive (chia sẻ ở chế độ &quot;Bất kỳ ai có đường liên kết&quot;)
+                    <input
+                      name="externalUrl"
+                      type="url"
+                      placeholder="https://drive.google.com/file/d/..."
+                      value={docExternalUrl}
+                      onChange={(event) => setDocExternalUrl(event.target.value)}
+                      required={!editingDocument}
+                    />
+                  </label>
+                )}
+                {docLinkMode === "link" && (
+                  <p className="privacy-note">
+                    File vẫn nằm trên Google Drive của anh, không chiếm dung lượng ổ cứng server.
+                    Nhớ bật chia sẻ công khai (&quot;Bất kỳ ai có đường liên kết&quot;) trước khi dán link.
+                    Lưu ý: Google Drive chỉ xem trước được file không quá lớn — nếu khách thấy
+                    &quot;Tệp này quá lớn không thể xem trước&quot;, chuyển sang &quot;Tải file lên&quot; cho file đó
+                    (hỗ trợ tới 50 MB, trình duyệt tự hiển thị được, không bị Google giới hạn).
+                  </p>
+                )}
                 <div className="ai-document-tools">
                   <label className="check-label"><input name="aiConsent" type="checkbox" /><span>Tôi xác nhận Sunfood có quyền gửi tệp này đến dịch vụ AI để phân tích; kết quả chỉ là bản nháp nội bộ.</span></label>
                   <button type="button" className="secondary-btn" disabled={aiBusy || busy} onClick={analyzeDocument}>{aiBusy ? 'Đang đọc hồ sơ…' : 'AI đọc & đối chiếu hồ sơ'}</button>
@@ -1126,7 +1228,7 @@ export default function AdminDashboard({
               <h2 id="preview-dialog-title">Xem trước hồ sơ</h2>
               <button type="button" onClick={() => setPreviewUrl(null)} aria-label="Đóng cửa sổ xem trước" title="Đóng">×</button>
             </div>
-            {/\.pdf(?:\?|$)/i.test(previewUrl) ? (
+            {/\.pdf(?:\?|$)/i.test(previewUrl) || previewUrl.includes("drive.google.com") ? (
               <iframe src={previewUrl} title="Xem trước PDF" />
             ) : (
               <img src={previewUrl} alt="Xem trước hồ sơ" />

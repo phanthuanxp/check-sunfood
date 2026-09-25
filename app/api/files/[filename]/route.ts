@@ -13,8 +13,9 @@ export async function GET(_:Request,{params}:{params:Promise<{filename:string}>}
   const document=await prisma.document.findFirst({where:{fileUrl},select:{isPublic:true}});
   const archivedVersion=document?null:await prisma.documentVersion.findFirst({where:{fileUrl},select:{id:true}});
   const productPhoto=document||archivedVersion?null:await prisma.product.findFirst({where:{imageUrl:fileUrl},select:{isPublic:true}});
-  if(!document&&!archivedVersion&&!productPhoto)return NextResponse.json({error:'File not found'},{status:404});
-  const isPublic=document?document.isPublic:productPhoto?productPhoto.isPublic:false;
+  const supplierLogo=document||archivedVersion||productPhoto?null:await prisma.supplier.findFirst({where:{logoUrl:fileUrl},select:{id:true}});
+  if(!document&&!archivedVersion&&!productPhoto&&!supplierLogo)return NextResponse.json({error:'File not found'},{status:404});
+  const isPublic=document?document.isPublic:productPhoto?productPhoto.isPublic:supplierLogo?true:false;
   if((archivedVersion||!isPublic)&&!(await isAdmin()))return NextResponse.json({error:'Unauthorized'},{status:401});
   try{
     const bytes=await loadUpload(filename);

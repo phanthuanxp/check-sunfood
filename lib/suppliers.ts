@@ -6,7 +6,7 @@ export function supplierData(body: Record<string, unknown>, code: string, name: 
     phone: optional('phone'), website: optional('website'), email: optional('email'),
     description: optional('description'), descriptionEn: optional('descriptionEn'),
     storage: optional('storage'), storageEn: optional('storageEn'), shelfLife: optional('shelfLife'), shelfLifeEn: optional('shelfLifeEn'),
-    notes: optional('notes'), notesEn: optional('notesEn'),
+    notes: optional('notes'), notesEn: optional('notesEn'), logoUrl: optional('logoUrl'),
     status: String(body.status || 'ACTIVE'), verificationStatus: String(body.verificationStatus || 'PENDING'),
   };
 }

@@ -28,6 +28,7 @@ model Supplier {
   shelfLifeEn     String?
   sourceUrl       String?
   legacyDocsUrl   String?
+  logoUrl         String?
   status          String     @default("ACTIVE")
   verificationStatus String  @default("PENDING")
   notes           String?

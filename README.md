@@ -81,7 +81,7 @@ Mục tiêu kiến trúc là sau khi migration xong, website **không phụ thu�
 
 1. Đăng nhập admin bằng credential trong `.env` và cookie ký HMAC.
 2. CRUD nhà cung cấp và API CRUD hồ sơ.
-3. Upload PDF/JPG/PNG tối đa 10 MB vào kho riêng `storage/uploads`, kiểm tra MIME và chữ ký đầu tệp. Tệp nội bộ chỉ được đọc qua API có xác thực.
+3. Upload PDF/JPG/PNG tối đa 50 MB vào kho riêng `storage/uploads`, kiểm tra MIME và chữ ký đầu tệp; hoặc dán link Google Drive công khai để không chiếm dung lượng server. Tệp nội bộ chỉ được đọc qua API có xác thực.
 4. Phân loại hồ sơ: ĐKKD, ATTP, kiểm nghiệm, VietGAP/HACCP/ISO, hợp đồng và hồ sơ khác.
 5. Ngày cấp/ngày hết hạn, dashboard cảnh báo 30/60/90 ngày, hết hạn và thiếu hồ sơ; có lọc và xuất CSV.
 6. Thư viện hiển thị QR riêng cho từng NCC, tải PNG/SVG, in A6/A5 và tải ZIP toàn bộ; mỗi mã trỏ đúng `NEXT_PUBLIC_SITE_URL/qr/NCC-xx`.

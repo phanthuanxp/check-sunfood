@@ -519,7 +519,7 @@ export default function BatchesTable() {
           <div className="document-form">
             <h3>Thông tin sản phẩm</h3>
             <form className="trace-edit-form" onSubmit={saveProduct}>
-              <label className="wide">Ảnh sản phẩm <small>Hiển thị làm ảnh nền trong trang truy xuất công khai của lô. Chấp nhận JPG/PNG, tối đa 10MB.</small>
+              <label className="wide">Ảnh sản phẩm <small>Hiển thị làm ảnh nền trong trang truy xuất công khai của lô. Chấp nhận JPG/PNG, tối đa 50MB.</small>
                 <div className="trace-image-row">
                   {!removeProductImage && (productImagePreview || drawerBatch.product.imageUrl) && <img className="trace-product-thumb" src={productImagePreview || drawerBatch.product.imageUrl || ''} alt="" />}
                   <div className="trace-image-actions">
