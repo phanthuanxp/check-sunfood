@@ -1,13 +1,15 @@
 import Image from 'next/image';
-import { connection } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { HomeHeader } from '@/components/home/HomeHeader';
 import { SupplierDirectory } from '@/components/home/SupplierDirectory';
 import { TraceabilityHero } from '@/components/home/TraceabilityHero';
 import styles from '@/components/home/HomePage.module.css';
 
+// The supplier directory only changes via admin actions, so a short cache window avoids
+// re-querying and re-rendering the whole homepage on every single visit.
+export const revalidate = 60;
+
 export default async function Home() {
-  await connection();
   const suppliers = await prisma.supplier.findMany({
     where: { status: 'ACTIVE' },
     orderBy: { code: 'asc' },

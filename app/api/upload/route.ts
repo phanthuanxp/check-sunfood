@@ -1,9 +1,20 @@
 import { NextResponse } from 'next/server';
+import sharp from 'sharp';
 import { isAdmin } from '@/lib/auth';
 import { rejectUntrustedMutation } from '@/lib/security';
 import { saveUpload } from '@/lib/storage';
 
-const allowed = new Map([
+// Phone camera photos routinely arrive at 4000px+/several MB; re-encoding caps the dimensions
+// and file size for web display while staying visually lossless for document/label reading.
+// PNG stays lossless (only resized) so supplier logo transparency isn't degraded.
+async function compressImage(bytes: Uint8Array, extension: '.jpg' | '.png') {
+  const image = sharp(bytes).rotate().resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true });
+  return extension === '.jpg'
+    ? image.jpeg({ quality: 85, mozjpeg: true }).toBuffer()
+    : image.png({ compressionLevel: 9 }).toBuffer();
+}
+
+const allowed = new Map<string, '.pdf' | '.jpg' | '.png'>([
   ['application/pdf', '.pdf'], ['image/jpeg', '.jpg'], ['image/png', '.png']
 ]);
 
@@ -23,6 +34,10 @@ export async function POST(request: Request) {
       ? [137,80,78,71,13,10,26,10].every((value, index) => bytes[index] === value)
       : bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
   if (!validSignature) return NextResponse.json({ error: 'Nội dung tệp không khớp định dạng PDF/JPG/PNG.' }, { status: 415 });
-  const filename = await saveUpload(bytes, extension);
+  // Some sources (e.g. pre-optimized graphics) already beat sharp's re-encode, especially for
+  // PNG, which is lossless — only keep the compressed version when it's actually smaller.
+  const compressed = extension === '.pdf' ? null : await compressImage(bytes, extension).catch(() => null);
+  const toStore = compressed && compressed.length < bytes.length ? compressed : bytes;
+  const filename = await saveUpload(toStore, extension);
   return NextResponse.json({ fileUrl: `/api/files/${filename}`, originalName: file.name });
 }

@@ -20,6 +20,8 @@ export async function GET(_:Request,{params}:{params:Promise<{filename:string}>}
   try{
     const bytes=await loadUpload(filename);
     const contentType=mime[path.extname(filename).toLowerCase()]||'application/octet-stream';
-    return new NextResponse(new Uint8Array(bytes),{headers:{'Content-Type':contentType,'Content-Disposition':`inline; filename="${filename}"`,'Cache-Control':isPublic?'public, max-age=3600':'private, no-store','X-Content-Type-Options':'nosniff'}});
+    // Uploaded filenames embed a timestamp+UUID and are never reused, so a public file's
+    // bytes never change in place — safe to cache for a long time once it has been public.
+    return new NextResponse(new Uint8Array(bytes),{headers:{'Content-Type':contentType,'Content-Disposition':`inline; filename="${filename}"`,'Cache-Control':isPublic?'public, max-age=31536000, immutable':'private, no-store','X-Content-Type-Options':'nosniff'}});
   }catch{return NextResponse.json({error:'File not found'},{status:404});}
 }

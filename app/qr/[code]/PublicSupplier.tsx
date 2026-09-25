@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import SupplierQrThumbnail from './SupplierQrThumbnail';
 
@@ -127,8 +128,19 @@ function DocumentAccordion({ documents, lang, empty, emptyTitle }: { documents: 
   })}</div>;
 }
 
-export default function PublicSupplier({ supplier, initialLanguage, initialTab }: { supplier: Supplier; initialLanguage: Language | null; initialTab?: TabKey | null }) {
-  const [tab, setTab] = useState<TabKey>(initialTab || 'source');
+export default function PublicSupplier({ supplier }: { supplier: Supplier }) {
+  // Read once on mount rather than subscribing to useSearchParams()'s live value: the page is
+  // cached (no server-side searchParams read), so ?lang=/?tab= only need to set the initial
+  // state, exactly like the old server-provided initialLanguage/initialTab props did.
+  const searchParams = useSearchParams();
+  const [initialLanguage] = useState<Language | null>(() => {
+    const raw = searchParams.get('lang');
+    return raw === 'vi' || raw === 'en' ? raw : null;
+  });
+  const [tab, setTab] = useState<TabKey>(() => {
+    const raw = searchParams.get('tab');
+    return raw === 'source' || raw === 'lots' || raw === 'legal' ? raw : 'source';
+  });
   const [languageOverride, setLanguageOverride] = useState<Language | null>(null);
   const hydrated = useSyncExternalStore(subscribeToHydration, () => true, () => false);
   const lang = languageOverride || initialLanguage || (hydrated ? readStoredLanguage() : null) || 'vi';

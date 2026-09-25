@@ -1,15 +1,18 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { cache } from 'react';
+import { cache, Suspense } from 'react';
 import { prisma } from '@/lib/prisma';
 import PublicSupplier from './PublicSupplier';
 
-export const dynamic = 'force-dynamic';
+// Data only changes via admin actions (not continuously), so a short cache window lets
+// repeat/popular QR scans hit the render cache instead of re-querying on every view.
+// Reading `?lang=`/`?tab=` here would force this page to fully re-render on every request
+// (searchParams access opts a page out of caching) — PublicSupplier reads them client-side
+// via useSearchParams() instead, so this page stays cacheable.
+export const revalidate = 60;
 
-type Language = 'vi' | 'en';
 type PageProps = {
   params: Promise<{ code: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
 const getPublicSupplier = cache((code: string) => prisma.supplier.findUnique({
@@ -67,16 +70,6 @@ const getPublicSupplier = cache((code: string) => prisma.supplier.findUnique({
   },
 }));
 
-function requestedLanguage(searchParams: Record<string, string | string[] | undefined>): Language | null {
-  const raw = Array.isArray(searchParams.lang) ? searchParams.lang[0] : searchParams.lang;
-  return raw === 'vi' || raw === 'en' ? raw : null;
-}
-
-function requestedTab(searchParams: Record<string, string | string[] | undefined>): 'source' | 'lots' | 'legal' | null {
-  const raw = Array.isArray(searchParams.tab) ? searchParams.tab[0] : searchParams.tab;
-  return raw === 'source' || raw === 'lots' || raw === 'legal' ? raw : null;
-}
-
 function siteOrigin() {
   const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
   if (configured) {
@@ -85,28 +78,35 @@ function siteOrigin() {
   return 'https://check.sunfoodtaydo.com';
 }
 
-export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
-  const [{ code }, query] = await Promise.all([params, searchParams]);
+// No supplier codes are known at build time; an explicit empty list (rather than omitting
+// this function) is what tells Next.js to treat this segment as ISR-eligible on demand
+// instead of fully dynamic, since self-hosted output only registers dynamicRoutes when present.
+export async function generateStaticParams() {
+  return [];
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { code } = await params;
   const normalizedCode = code.trim().toUpperCase();
   const supplier = await getPublicSupplier(normalizedCode);
-  const lang = requestedLanguage(query) || 'vi';
 
   if (!supplier) {
     return {
-      title: lang === 'en' ? 'Supplier not found | Sunfood Tây Đô' : 'Không tìm thấy nhà cung cấp | Sunfood Tây Đô',
+      title: 'Không tìm thấy nhà cung cấp | Sunfood Tây Đô',
       robots: { index: false, follow: false },
     };
   }
 
-  const supplierName = lang === 'en' ? (supplier.nameEn || supplier.name) : supplier.name;
-  const productName = lang === 'en' ? (supplier.productNameEn || supplier.productName) : supplier.productName;
-  const description = lang === 'en'
-    ? `Traceability information for ${supplierName}${productName ? ` — ${productName}` : ''}, managed by Sunfood Tây Đô.`
-    : `Thông tin truy xuất nguồn gốc của ${supplierName}${productName ? ` — ${productName}` : ''}, do Sunfood Tây Đô quản lý.`;
+  // Metadata is generated once per revalidate window (not per-request), so it can't vary by
+  // the requester's ?lang= — always Vietnamese here; `alternates.languages` below still tells
+  // search engines the English variant exists at ?lang=en.
+  const supplierName = supplier.name;
+  const productName = supplier.productName;
+  const description = `Thông tin truy xuất nguồn gốc của ${supplierName}${productName ? ` — ${productName}` : ''}, do Sunfood Tây Đô quản lý.`;
   const canonical = `${siteOrigin()}/qr/${encodeURIComponent(supplier.code)}`;
 
   return {
-    title: `${supplierName} | ${lang === 'en' ? 'Traceability' : 'Truy xuất nguồn gốc'} Sunfood Tây Đô`,
+    title: `${supplierName} | Truy xuất nguồn gốc Sunfood Tây Đô`,
     description,
     alternates: {
       canonical,
@@ -114,23 +114,21 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
     },
     openGraph: {
       type: 'website',
-      url: lang === 'en' ? `${canonical}?lang=en` : canonical,
+      url: canonical,
       siteName: 'Sunfood Tây Đô',
-      title: `${supplierName} | ${lang === 'en' ? 'Traceability' : 'Truy xuất nguồn gốc'}`,
+      title: `${supplierName} | Truy xuất nguồn gốc`,
       description,
-      locale: lang === 'en' ? 'en_US' : 'vi_VN',
+      locale: 'vi_VN',
     },
   };
 }
 
-export default async function SupplierPage({ params, searchParams }: PageProps) {
-  const [{ code }, query] = await Promise.all([params, searchParams]);
+export default async function SupplierPage({ params }: PageProps) {
+  const { code } = await params;
   const supplier = await getPublicSupplier(code.trim().toUpperCase());
   if (!supplier) notFound();
 
-  return <PublicSupplier
-    supplier={JSON.parse(JSON.stringify(supplier))}
-    initialLanguage={requestedLanguage(query)}
-    initialTab={requestedTab(query)}
-  />;
+  return <Suspense>
+    <PublicSupplier supplier={JSON.parse(JSON.stringify(supplier))} />
+  </Suspense>;
 }

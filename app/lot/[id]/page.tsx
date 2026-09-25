@@ -18,7 +18,9 @@ function parseHanoiCheckPayload(sourceSystem: string, payload: string | null): H
 
 type DisplayStep = { key: string | number; title: string; performedBy: string | null; performedByRole: string | null; note: string | null };
 
-export const dynamic = 'force-dynamic';
+// Data only changes via admin actions (not continuously), so a short cache window lets
+// repeat/popular QR scans hit the render cache instead of re-querying on every view.
+export const revalidate = 60;
 
 const format = (date: Date | null) => date
   ? new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' }).format(date)
@@ -86,6 +88,13 @@ const PRODUCT_ICON_RULES: [RegExp, string][] = [
 function productIcon(name: string) {
   for (const [pattern, icon] of PRODUCT_ICON_RULES) if (pattern.test(name)) return icon;
   return '🍽️';
+}
+
+// No lot IDs are known at build time; an explicit empty list (rather than omitting this
+// function) is what tells Next.js to treat this segment as ISR-eligible on demand instead
+// of fully dynamic, since self-hosted output only registers dynamicRoutes when present.
+export async function generateStaticParams() {
+  return [];
 }
 
 export default async function LotPage({ params }: { params: Promise<{ id: string }> }) {
