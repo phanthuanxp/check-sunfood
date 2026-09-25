@@ -28,6 +28,7 @@ const getPublicSupplier = cache((code: string) => prisma.supplier.findUnique({
     email: true,
     description: true,
     descriptionEn: true,
+    logoUrl: true,
     status: true,
     verificationStatus: true,
     updatedAt: true,

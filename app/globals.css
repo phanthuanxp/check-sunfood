@@ -689,6 +689,25 @@ button {
 .code-pill b {
   color: #b9f1d1;
 }
+
+/* Shared hero badge/QR-thumbnail pattern (lot page + supplier page heroes). */
+.lot-hero-badge { display: inline-flex; align-items: center; gap: 6px; width: fit-content; padding: 6px 12px; border-radius: 999px; background: #e8f7ef; color: #087a43; font-size: 12px; font-weight: 700; }
+.lot-hero-top-row { display: flex; align-items: stretch; justify-content: space-between; gap: 14px; }
+.lot-hero-meta { display: flex; flex-direction: column; justify-content: space-between; gap: 8px; }
+.lot-hero-code-row { font-size: 13px; color: #bcead0; font-weight: 400; }
+.lot-hero-code-row b { margin-left: 4px; font-size: 14px; font-weight: 800; color: #fff; }
+.lot-hero-qr { flex: 0 0 auto; align-self: center; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px; background: #fff; border: 0; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22); }
+.lot-hero-qr img { display: block; width: 85px; height: 85px; }
+.lot-hero-qr-label { font-size: 10px; font-weight: 700; color: #0b7648; line-height: 1.2; }
+.lot-qr-modal-backdrop { position: fixed; inset: 0; z-index: 60; background: rgba(6, 30, 20, 0.72); display: grid; place-items: center; padding: 20px; }
+.lot-qr-modal { width: min(320px, 100%); background: #fff; border-radius: 16px; padding: 24px; text-align: center; position: relative; }
+.lot-qr-modal img { width: 100%; height: auto; }
+.lot-qr-modal p { margin: 12px 0 0; font-weight: 700; color: #163b2a; }
+.lot-qr-modal-close { position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; border: 0; border-radius: 50%; background: #f1f5f3; color: #45564d; font-size: 18px; cursor: pointer; }
+.lot-qr-modal-actions { display: flex; gap: 10px; margin-top: 14px; }
+.lot-qr-print-link { flex: 1; display: inline-block; padding: 10px 14px; border-radius: 9px; background: #0b7648; color: #fff; font-weight: 700; font-size: 13px; text-decoration: none; }
+.lot-qr-print-link:first-child { background: #fff; color: #0b7648; border: 1px solid #0b7648; }
+
 .trace-container {
   max-width: 960px;
   margin: -24px auto 0;
@@ -705,9 +724,26 @@ button {
   box-shadow: 0 10px 35px #063d2212;
   border: 1px solid #e1ebe5;
 }
+.supplier-heading-body {
+  flex: 1;
+  min-width: 0;
+}
+.supplier-heading-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.supplier-heading-top p {
+  margin: 0;
+}
+.supplier-heading-verified {
+  flex-shrink: 0;
+}
 .supplier-avatar {
-  width: 58px;
-  height: 58px;
+  width: 64px;
+  height: 64px;
   border-radius: 14px;
   display: grid;
   place-items: center;
@@ -715,6 +751,21 @@ button {
   color: #087a43;
   font-size: 20px;
   font-weight: 900;
+}
+.supplier-avatar-logo {
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #e7f6ee;
+}
+.supplier-avatar-logo-img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform: translate(-50%, -50%);
 }
 .supplier-heading p {
   font-size: 10px;
@@ -800,6 +851,59 @@ button {
 }
 .source-grid .wide {
   grid-column: 1/-1;
+}
+.source-grid article.source-contact-compact {
+  flex-direction: column;
+  gap: 0;
+}
+.source-contact-compact > div {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 0;
+  border-bottom: 1px solid #eef3f0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.source-contact-compact > div:first-child {
+  padding-top: 0;
+}
+.source-contact-compact > div:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.source-contact-compact > div > span:first-child,
+.source-contact-compact .row-head span:first-child {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  background: #eaf7f0;
+  color: #087a43;
+  border-radius: 8px;
+  font-size: 12px;
+  margin-top: 1px;
+}
+.source-contact-compact b {
+  flex: 0 0 auto;
+  color: #556359;
+  font-weight: 700;
+  margin-top: 3px;
+}
+.source-contact-compact > div.stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+.source-contact-compact .row-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.source-contact-compact > div.stacked p {
+  margin: 0;
+  padding-left: 35px;
 }
 .public-docs {
   display: grid;
@@ -1562,9 +1666,10 @@ button {
     padding: 15px;
   }
   .supplier-avatar {
-    width: 48px;
-    height: 48px;
-    flex: 0 0 48px;
+    width: 60px;
+    height: 60px;
+    flex: 0 0 60px;
+    align-self: center;
   }
   .supplier-heading h2 {
     font-size: 15px;
@@ -1753,6 +1858,15 @@ button {
   grid-template-columns: 18px 1fr !important;
   align-items: center;
 }
+.doc-source-toggle {
+  display: flex;
+  gap: 8px;
+}
+.doc-source-toggle .secondary-btn.active {
+  background: linear-gradient(180deg, #128052, #08673f);
+  border-color: transparent;
+  color: #fff;
+}
 .check-label input {
   width: 18px;
   height: 18px;
@@ -1901,8 +2015,8 @@ button {
     box-shadow: 0 5px 20px rgba(6, 61, 41, 0.07);
   }
   .trace-logo > img {
-    width: 38px;
-    height: 38px;
+    width: 48px;
+    height: 48px;
   }
   .trace-logo b {
     font-size: 13px;
@@ -1924,7 +2038,6 @@ button {
     width: 100%;
     height: auto;
     aspect-ratio: 1122 / 1402;
-    border-radius: 0 0 24px 24px;
     background: #00613f;
   }
   .traceability-hero__media img {
@@ -2103,7 +2216,6 @@ button {
   }
   .trace-hero {
     min-height: 215px;
-    border-radius: 0 0 22px 22px;
   }
   .hero-glow {
     width: 330px;
@@ -2140,11 +2252,12 @@ button {
     box-shadow: 0 12px 32px rgba(6, 61, 34, 0.1);
   }
   .supplier-avatar {
-    width: 44px;
-    height: 44px;
-    flex: 0 0 44px;
+    width: 60px;
+    height: 60px;
+    flex: 0 0 60px;
     border-radius: 12px;
     font-size: 16px;
+    align-self: center;
   }
   .supplier-heading h2 {
     font-size: 14px;
@@ -3063,7 +3176,7 @@ select:disabled {
 
 @media (max-width: 1100px) {
   .traceability-hero__content {
-    width: 62%;
+    width: 100%;
   }
 
   .traceability-hero h1 {

@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import SupplierQrThumbnail from './SupplierQrThumbnail';
 
 type Language = 'vi' | 'en';
 type TabKey = 'source' | 'lots' | 'legal';
@@ -23,6 +24,7 @@ type Supplier = {
   email: string | null;
   description: string | null;
   descriptionEn: string | null;
+  logoUrl: string | null;
   status: string;
   verificationStatus: string;
   updatedAt: string;
@@ -40,7 +42,7 @@ const categoryLabels = {
 } as const;
 const copy = {
   vi: {
-    tagline: 'Minh bạch từ nguồn — An tâm mỗi bữa', verified: '✓ Đã xác minh', pending: '◷ Đang đối chiếu', system: 'HỆ THỐNG TRUY XUẤT NGUỒN GỐC',
+    tagline: 'Minh bạch từ nguồn — An tâm mỗi bữa', verified: '✓ Đã xác minh', pending: '◷ Đang đối chiếu', system: 'Nhà cung cấp đã xác minh trên HanoiCheck', systemPending: 'Đang đối chiếu dữ liệu nhà cung cấp',
     productFallback: 'Thông tin sản phẩm đang được đối chiếu', supplierCode: 'Mã nhà cung cấp', supplier: 'NHÀ CUNG CẤP', active: 'Đang hợp tác', inactive: 'Tạm ngừng công khai',
     tabs: { source: 'Thông tin', lots: 'Lô nhập hàng', legal: 'Hồ sơ pháp lý' },
     tabList: 'Nội dung truy xuất nguồn gốc', language: 'Chọn ngôn ngữ', address: 'Địa chỉ nhà cung cấp', tax: 'Mã số thuế', phone: 'Hotline', website: 'Website', email: 'Email',
@@ -52,7 +54,7 @@ const copy = {
     translationNote: 'Nội dung này đang hiển thị theo hồ sơ gốc tiếng Việt.',
   },
   en: {
-    tagline: 'Transparent sourcing — Confidence in every meal', verified: '✓ Verified', pending: '◷ Under review', system: 'PRODUCT TRACEABILITY SYSTEM',
+    tagline: 'Transparent sourcing — Confidence in every meal', verified: '✓ Verified', pending: '◷ Under review', system: 'Supplier verified on HanoiCheck', systemPending: 'Supplier data under review',
     productFallback: 'Product information is under review', supplierCode: 'Supplier code', supplier: 'SUPPLIER', active: 'Active supplier', inactive: 'Public display paused',
     tabs: { source: 'Information', lots: 'Inbound lots', legal: 'Legal documents' },
     tabList: 'Traceability content', language: 'Choose language', address: 'Supplier address', tax: 'Tax identification number', phone: 'Hotline', website: 'Website', email: 'Email',
@@ -109,7 +111,7 @@ function DocumentAccordion({ documents, lang, empty, emptyTitle }: { documents: 
   if (!documents.length) return <div className="empty-state"><span>◎</span><b>{emptyTitle}</b><p>{empty}</p></div>;
   return <div className="public-docs">{documents.map(document => {
     const isOpen = openId === document.id;
-    const isPdf = /\.pdf(?:\?|$)/i.test(document.fileUrl);
+    const isEmbeddedFrame = /\.pdf(?:\?|$)/i.test(document.fileUrl) || document.fileUrl.includes('drive.google.com');
     return <div className={`public-doc-item${isOpen ? ' open' : ''}`} key={document.id}>
       <button type="button" className="public-doc" aria-expanded={isOpen} onClick={() => setOpenId(isOpen ? null : document.id)}>
         <span className="file-icon">▤</span><span className="public-doc-title"><b>{lang === 'en' ? (document.titleEn || document.title) : document.title}</b>
@@ -118,7 +120,7 @@ function DocumentAccordion({ documents, lang, empty, emptyTitle }: { documents: 
         </span><span className="public-doc-chevron" aria-hidden="true">⌄</span>
       </button>
       {isOpen && <div className="public-doc-body">
-        {isPdf ? <iframe src={document.fileUrl} title={document.title} className="public-doc-frame" /> : <img src={document.fileUrl} alt={document.title} className="public-doc-image" />}
+        {isEmbeddedFrame ? <iframe src={document.fileUrl} title={document.title} className="public-doc-frame" /> : <img src={document.fileUrl} alt={document.title} className="public-doc-image" />}
         <a href={document.fileUrl} target="_blank" rel="noreferrer" className="public-doc-openlink">{t.open}</a>
       </div>}
     </div>;
@@ -179,21 +181,32 @@ export default function PublicSupplier({ supplier, initialLanguage, initialTab }
   return <main className="trace-page"><header className="trace-header"><Link href="/" className="trace-logo"><Image src="/brand/sunfood-logo.png" alt="" width={44} height={44} /><div><b>SUNFOOD TÂY ĐÔ</b><small>{t.tagline}</small></div></Link><div className="trace-header-actions"><div className="language-switch" role="group" aria-label={t.language}>
     <button type="button" className={lang === 'vi' ? 'active' : ''} aria-pressed={lang === 'vi'} onClick={() => changeLanguage('vi')}>VI</button>
     <button type="button" className={lang === 'en' ? 'active' : ''} aria-pressed={lang === 'en'} onClick={() => changeLanguage('en')}>EN</button>
-  </div><span className={isVerified ? 'verified' : 'verified pending'}>{isVerified ? t.verified : t.pending}</span></div></header>
-    <section className="trace-hero"><div className="hero-glow" /><div className="hero-content"><p>{t.system}</p><h1>{product}</h1>{lang === 'en' && !supplier.productNameEn && supplier.productName && <small className="translation-note">{t.translationNote}</small>}<div className="code-pill">{t.supplierCode} <b>{supplier.code}</b></div></div></section>
-    <section className="trace-container"><div className="supplier-heading"><div className="supplier-avatar">{supplier.code.slice(-2)}</div><div><p>{t.supplier}</p><h2>{supplierName}</h2>{lang === 'en' && !supplier.nameEn && <small className="translation-inline">{t.translationNote}</small>}<span className={supplier.status === 'ACTIVE' ? 'active-dot' : 'inactive-dot'}>● {supplier.status === 'ACTIVE' ? t.active : t.inactive}</span></div></div>
+  </div></div></header>
+    <section className="trace-hero lot-hero-has-qr"><div className="hero-glow" /><div className="hero-content">
+      <div className="lot-hero-top-row">
+        <div className="lot-hero-meta">
+          <span className="lot-hero-badge">{isVerified ? '✓ ' : '◷ '}{isVerified ? t.system : t.systemPending}</span>
+          <div className="lot-hero-code-row">{t.supplierCode}: <b>{supplier.code}</b></div>
+          <div className="lot-hero-code-row"><b>{product}</b></div>
+        </div>
+        <SupplierQrThumbnail code={supplier.code} />
+      </div>
+    </div></section>
+    <section className="trace-container"><div className="supplier-heading">{supplier.logoUrl ? <div className="supplier-avatar supplier-avatar-logo"><Image src={supplier.logoUrl} alt="" width={80} height={80} className="supplier-avatar-logo-img" /></div> : <div className="supplier-avatar">{supplier.code.slice(-2)}</div>}<div className="supplier-heading-body"><div className="supplier-heading-top"><p>{t.supplier}</p><span className={`verified supplier-heading-verified${isVerified ? '' : ' pending'}`}>{isVerified ? t.verified : t.pending}</span></div><h2>{supplierName}</h2>{lang === 'en' && !supplier.nameEn && <small className="translation-inline">{t.translationNote}</small>}<span className={supplier.status === 'ACTIVE' ? 'active-dot' : 'inactive-dot'}>● {supplier.status === 'ACTIVE' ? t.active : t.inactive}</span></div></div>
       <nav className="public-tabs" role="tablist" aria-label={t.tabList} aria-orientation="horizontal">{tabKeys.map(key => <button
         type="button" role="tab" id={`trace-tab-${key}`} aria-controls={`trace-panel-${key}`} aria-selected={tab === key} tabIndex={tab === key ? 0 : -1}
         className={tab === key ? 'active' : ''} onClick={() => selectTab(key)} onKeyDown={event => handleTabKeyDown(event, key)} key={key}
       >{t.tabs[key]}</button>)}</nav>
       <div className="tab-content" role="tabpanel" id={`trace-panel-${tab}`} aria-labelledby={`trace-tab-${tab}`} tabIndex={0}>
         {tab === 'source' && <div className="source-grid">
-          <article><span>⌖</span><div><label>{t.address}</label><p>{address}</p><TranslationNote show={lang === 'en' && !supplier.addressEn && Boolean(supplier.address)} lang={lang} /></div></article>
-          <article><span>▣</span><div><label>{t.tax}</label><p>{supplier.taxCode || t.missing}</p></div></article>
-          <article><span>☎</span><div><label>{t.phone}</label>{supplier.phone ? <p><a href={`tel:${supplier.phone.replace(/\s+/g, '')}`}>{supplier.phone}</a></p> : <p>{t.missing}</p>}</div></article>
-          <article><span>⊙</span><div><label>{t.website}</label>{website ? <p><a href={website} target="_blank" rel="noreferrer">{supplier.website}</a></p> : <p>{supplier.website || t.missing}</p>}</div></article>
-          <article><span>✉</span><div><label>{t.email}</label>{supplier.email ? <p><a href={`mailto:${supplier.email}`}>{supplier.email}</a></p> : <p>{t.missing}</p>}</div></article>
-          <article className="wide"><span>i</span><div><label>{t.description}</label><p>{description}</p><TranslationNote show={lang === 'en' && !supplier.descriptionEn && Boolean(supplier.description)} lang={lang} /></div></article>
+          <article className="wide source-contact-compact">
+            <div className="stacked"><div className="row-head"><span>⌖</span><b>{t.address}:</b></div><p>{address}<TranslationNote show={lang === 'en' && !supplier.addressEn && Boolean(supplier.address)} lang={lang} /></p></div>
+            <div><span>☎</span><b>{t.phone}:</b> {supplier.phone ? <a href={`tel:${supplier.phone.replace(/\s+/g, '')}`}>{supplier.phone}</a> : t.missing}</div>
+            <div><span>▣</span><b>{t.tax}:</b> {supplier.taxCode || t.missing}</div>
+            <div><span>⊙</span><b>{t.website}:</b> {website ? <a href={website} target="_blank" rel="noreferrer">{supplier.website}</a> : (supplier.website || t.missing)}</div>
+            <div><span>✉</span><b>{t.email}:</b> {supplier.email ? <a href={`mailto:${supplier.email}`}>{supplier.email}</a> : t.missing}</div>
+            <div className="stacked"><div className="row-head"><span>i</span><b>{t.description}:</b></div><p>{description}<TranslationNote show={lang === 'en' && !supplier.descriptionEn && Boolean(supplier.description)} lang={lang} /></p></div>
+          </article>
         </div>}
         {tab === 'lots' && <div className="public-lots">{isVerified && supplier.status === 'ACTIVE' && supplier.products.some(item => item.batches.length) ? supplier.products.flatMap(item => item.batches.map(batch => <Link className="public-lot" href={`/lot/${encodeURIComponent(batch.code)}?lang=${lang}`} key={batch.publicId}><span><b>{batch.name || item.name}</b><small>{lang === 'vi' ? 'Mã lô' : 'Lot code'}: {batch.code} · {lang === 'vi' ? 'Ngày nhập' : 'Received'}: {formatDate(batch.receivedAt, lang)}</small></span><strong>{lang === 'vi' ? 'Xem lô →' : 'View lot →'}</strong></Link>)) : <div className="empty-state"><span>▣</span><b>{lang === 'vi' ? 'Chưa có lô được công bố' : 'No published lots'}</b><p>{lang === 'vi' ? 'Lô nhập hàng chỉ xuất hiện sau khi thông tin và nhà cung cấp được xác minh.' : 'Inbound lots appear after the supplier and lot data are verified.'}</p></div>}</div>}
         {tab === 'legal' && <DocumentAccordion documents={legalDocs} lang={lang} empty={t.legalEmpty} emptyTitle={t.noDocs} />}

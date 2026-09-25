@@ -138,7 +138,7 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
         <div className="hero-glow" /><div className="hero-content">
         <div className="lot-hero-top-row">
           <div className="lot-hero-meta">
-            <span className="lot-hero-badge">✓ {batch.sourceSystem === 'HANOICHECK' ? 'Đã xác minh & đồng bộ HanoiCheck' : 'Hồ sơ lô đã công bố'}</span>
+            <span className="lot-hero-badge">✓ Đã xác minh &amp; đồng bộ HanoiCheck</span>
             <div className="lot-hero-code-row">Mã NCC: <b>{product.supplier.code}</b></div>
             <div className="lot-hero-code-row">Mã lô: <b>{batch.code}</b></div>
           </div>

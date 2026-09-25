@@ -753,11 +753,9 @@
   }
 
   .brandMark {
-    width: 38px;
-    height: 38px;
-    flex-basis: 38px;
-    border-radius: 11px;
-    font-size: 14px;
+    width: 48px;
+    height: 48px;
+    flex-basis: 48px;
   }
 
   .brandCopy strong {
